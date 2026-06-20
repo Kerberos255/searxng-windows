@@ -38,8 +38,10 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 5. 安装：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows" -RuntimePython "<python.exe>"
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
 ```
+
+如果系统 PATH 里没有可用的 `python` 命令，可以用 `-RuntimePython` 传入完整 Python 路径。
 
 6. 启动并检查：
 
@@ -127,6 +129,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Ro
 
 计划任务名称是 `OpenClaw SearXNG`。
 
+## CI
+
+GitHub Actions 会在 push 和 pull request 时检查 PowerShell 脚本语法和 Python 辅助脚本语法。
+
 ## 常用命令
 
 ```powershell
@@ -144,4 +150,6 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 
 本仓库的部署脚本和文档使用 MIT 许可证。
 
-本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。如果分发包含 SearXNG 源码或修改过的 SearXNG 文件的整包，需要遵守 SearXNG 的上游许可证。
+本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。Windows 兼容补丁会在安装/更新时应用到用户本机下载的 SearXNG 源码目录中；本仓库本身不重新分发已打补丁的 SearXNG 源码。
+
+如果分发包含 SearXNG 源码或修改过的 SearXNG 文件的整包，需要遵守 SearXNG 的上游许可证。

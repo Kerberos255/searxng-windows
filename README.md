@@ -38,8 +38,10 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 5. Install:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows" -RuntimePython "<python.exe>"
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
 ```
+
+If Python is not available as `python` in `PATH`, pass a full Python path with `-RuntimePython`.
 
 6. Start and check:
 
@@ -125,8 +127,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Ro
 
 The task name is `OpenClaw SearXNG`.
 
+## CI
+
+GitHub Actions validates PowerShell script syntax and Python helper syntax on push and pull requests.
+
 ## License Notes
 
 This repository's deployment scripts and documentation are MIT licensed.
 
-SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. Any distribution that bundles SearXNG source code or modified SearXNG files must comply with SearXNG's upstream license.
+SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. The Windows compatibility patch is applied locally to the downloaded SearXNG source tree during installation/update. This repository does not redistribute the patched SearXNG source.
+
+Any distribution that bundles SearXNG source code or modified SearXNG files must comply with SearXNG's upstream license.
