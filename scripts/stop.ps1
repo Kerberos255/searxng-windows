@@ -7,6 +7,15 @@ $ErrorActionPreference = "Continue"
 $PidFile = Join-Path $Root "searxng.pid"
 $Stopped = $false
 
+$Listeners = Get-NetTCPConnection -LocalPort 8888 -State Listen -ErrorAction SilentlyContinue
+foreach ($Listener in $Listeners) {
+    if ($Listener.OwningProcess -and $Listener.OwningProcess -ne $PID) {
+        Stop-Process -Id $Listener.OwningProcess -Force -ErrorAction SilentlyContinue
+        Write-Host "Stopped listener PID: $($Listener.OwningProcess)"
+        $Stopped = $true
+    }
+}
+
 if (Test-Path $PidFile) {
     $LauncherPid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue
     if ($LauncherPid) {

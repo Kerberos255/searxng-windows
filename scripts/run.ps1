@@ -1,6 +1,6 @@
 param(
     [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
-    [string]$ProxyUrl = "http://127.0.0.1:10808"
+    [string]$ProxyUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,14 +21,18 @@ if (!(Test-Path $Settings)) {
 
 $env:SEARXNG_SETTINGS_PATH = $Settings
 $env:PYTHONUTF8 = "1"
-$env:HTTP_PROXY = $ProxyUrl
-$env:HTTPS_PROXY = $ProxyUrl
-$env:ALL_PROXY = $ProxyUrl
-$env:http_proxy = $ProxyUrl
-$env:https_proxy = $ProxyUrl
-$env:all_proxy = $ProxyUrl
-$env:NO_PROXY = "127.0.0.1,localhost"
-$env:no_proxy = "127.0.0.1,localhost"
+
+if ($ProxyUrl) {
+    $env:HTTP_PROXY = $ProxyUrl
+    $env:HTTPS_PROXY = $ProxyUrl
+    $env:ALL_PROXY = $ProxyUrl
+    $env:http_proxy = $ProxyUrl
+    $env:https_proxy = $ProxyUrl
+    $env:all_proxy = $ProxyUrl
+    $env:NO_PROXY = "127.0.0.1,localhost"
+    $env:no_proxy = "127.0.0.1,localhost"
+    Write-Host "Using outbound proxy: $ProxyUrl"
+}
 
 Set-Location $Searxng
 

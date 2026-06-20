@@ -44,13 +44,14 @@ search:
     - html
     - json
 
-outgoing:
-  request_timeout: 10.0
-  max_request_timeout: 20.0
-  extra_proxy_timeout: 10
-  proxies:
-    all://:
-      - http://127.0.0.1:10808
+# Uncomment this block if direct outbound access to search engines times out.
+# outgoing:
+#   request_timeout: 10.0
+#   max_request_timeout: 20.0
+#   extra_proxy_timeout: 10
+#   proxies:
+#     all://:
+#       - http://127.0.0.1:10808
 
 ui:
   default_locale: "zh-Hans-CN"
@@ -66,15 +67,17 @@ engines:
     disabled: true
 ```
 
-`scripts\run.ps1` should set both SearXNG and proxy environment:
+`scripts\run.ps1` should always set SearXNG settings path. Proxy environment variables should only be set when `-ProxyUrl` is provided:
 
 ```powershell
 $env:SEARXNG_SETTINGS_PATH = $Settings
 $env:PYTHONUTF8 = "1"
-$env:HTTP_PROXY = "http://127.0.0.1:10808"
-$env:HTTPS_PROXY = "http://127.0.0.1:10808"
-$env:ALL_PROXY = "http://127.0.0.1:10808"
-$env:NO_PROXY = "127.0.0.1,localhost"
+if ($ProxyUrl) {
+  $env:HTTP_PROXY = $ProxyUrl
+  $env:HTTPS_PROXY = $ProxyUrl
+  $env:ALL_PROXY = $ProxyUrl
+  $env:NO_PROXY = "127.0.0.1,localhost"
+}
 ```
 
 ## Engine Counts

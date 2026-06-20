@@ -12,7 +12,7 @@ server:
   limiter: false
   public_instance: false
   image_proxy: false
-  method: "POST"
+  method: "GET"
 
 search:
   safe_search: 0
@@ -21,13 +21,14 @@ search:
     - html
     - json
 
-outgoing:
-  request_timeout: 10.0
-  max_request_timeout: 20.0
-  extra_proxy_timeout: 10
-  proxies:
-    all://:
-      - http://127.0.0.1:10808
+# Uncomment this block if direct outbound access to search engines times out.
+# outgoing:
+#   request_timeout: 10.0
+#   max_request_timeout: 20.0
+#   extra_proxy_timeout: 10
+#   proxies:
+#     all://:
+#       - http://127.0.0.1:10808
 
 ui:
   static_use_hash: true

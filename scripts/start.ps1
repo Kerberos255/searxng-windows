@@ -1,5 +1,6 @@
 param(
-    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows"
+    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
+    [string]$ProxyUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,7 @@ Remove-Item -LiteralPath $ErrLog -Force -ErrorAction SilentlyContinue
 
 $Process = Start-Process `
     -FilePath "powershell.exe" `
-    -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $RunScript, "-Root", $Root `
+    -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $RunScript, "-Root", $Root, "-ProxyUrl", $ProxyUrl `
     -WorkingDirectory $Root `
     -WindowStyle Hidden `
     -RedirectStandardOutput $Log `

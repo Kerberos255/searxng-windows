@@ -8,7 +8,7 @@
 
 - 使用标准 Python + venv，不需要 Docker
 - 本地 SearXNG 地址：`http://127.0.0.1:8888`
-- 支持给 SearXNG 出站搜索流量配置代理
+- 可选配置 SearXNG 出站搜索代理
 - 提供 start、stop、update、check 和登录自启动脚本
 - 包含 OpenClaw skill 和配置说明
 - 包含 SearXNG 在 Windows 上遇到 Unix-only `pwd` 导入问题时的兼容补丁
@@ -91,7 +91,7 @@ set "SEARXNG_URL=http://127.0.0.1:8888"
 
 ## 代理说明
 
-如果 SearXNG 直接访问搜索引擎超时，可以在 `settings.yml` 里配置出站代理：
+默认不启用代理。如果 SearXNG 直接访问搜索引擎超时，可以在 `settings.yml` 里取消注释代理配置：
 
 ```yaml
 outgoing:
@@ -103,7 +103,13 @@ outgoing:
       - http://127.0.0.1:10808
 ```
 
-`run.ps1` 也会设置常见代理环境变量。请把 `127.0.0.1:10808` 改成你的本地代理地址；如果直连可用，可以删除代理配置。
+然后用 `-ProxyUrl` 启动，让 `run.ps1` 同时设置常见代理环境变量：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1" -ProxyUrl "http://127.0.0.1:10808"
+```
+
+请把 `127.0.0.1:10808` 改成你的本地代理地址。
 
 ## 搜索引擎说明
 
@@ -133,3 +139,9 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 ## Skill
 
 `skill/` 目录里包含一个可放入 OpenClaw/Codex skill 目录的 SearXNG skill，用于记录本地部署、诊断流程和搜索脚本。
+
+## 许可证说明
+
+本仓库的部署脚本和文档使用 MIT 许可证。
+
+本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。如果分发包含 SearXNG 源码或修改过的 SearXNG 文件的整包，需要遵守 SearXNG 的上游许可证。

@@ -13,10 +13,14 @@ $Python = Join-Path $Venv "Scripts\python.exe"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptRoot
 
-if (!(Test-Path $RuntimePython)) {
-    Write-Host "Runtime Python not found: $RuntimePython"
+$PythonCommand = Get-Command $RuntimePython -ErrorAction SilentlyContinue
+
+if (!$PythonCommand) {
+    Write-Host "Runtime Python not found in PATH or as a file: $RuntimePython"
     exit 1
 }
+
+$RuntimePythonResolved = $PythonCommand.Source
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "scripts"),(Join-Path $Root "config") | Out-Null
@@ -27,7 +31,7 @@ if ((Resolve-Path -LiteralPath $ScriptRoot).Path -ne (Resolve-Path -LiteralPath 
 
 if (!(Test-Path (Join-Path $Root "config\settings.yml")) -and (Test-Path (Join-Path $RepoRoot "config\settings.example.yml"))) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot "config\settings.example.yml") -Destination (Join-Path $Root "config\settings.yml")
-    $Secret = (& $RuntimePython -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
+    $Secret = (& $RuntimePythonResolved -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
     $SettingsPath = Join-Path $Root "config\settings.yml"
     $SettingsText = Get-Content -LiteralPath $SettingsPath -Raw
     $SettingsText = $SettingsText.Replace("CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE", $Secret)
@@ -52,7 +56,7 @@ if (!(Test-Path $Repo)) {
 }
 
 if (!(Test-Path $Python)) {
-    & $RuntimePython -m venv $Venv
+    & $RuntimePythonResolved -m venv $Venv
 }
 
 & $Python -m pip install -U pip setuptools wheel
@@ -60,7 +64,15 @@ if (!(Test-Path $Python)) {
 Set-Location $Repo
 
 & $Python -m pip install -r requirements.txt
-& $Python -m pip install --no-build-isolation -e .
+& $Python -m pip install -e .
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Editable install failed with build isolation; retrying without build isolation."
+    & $Python -m pip install --no-build-isolation -e .
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Editable install failed."
+        exit $LASTEXITCODE
+    }
+}
 
 & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "apply-windows-patch.ps1") -Root $Root
 

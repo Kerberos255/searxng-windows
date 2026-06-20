@@ -16,7 +16,7 @@ This skill covers the local Windows SearXNG instance deployed for OpenClaw.
 - OpenClaw config: `<openclaw-home>\.openclaw\openclaw.json`
 - OpenClaw launcher: `<openclaw-home>\openclaw.cmd`
 - Local URL: `http://127.0.0.1:8888`
-- Example local proxy for outbound search-engine traffic: `http://127.0.0.1:10808`
+- Optional example local proxy for outbound search-engine traffic: `http://127.0.0.1:10808`
 
 ## Core Commands
 
@@ -28,6 +28,8 @@ powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\stop.ps1
 powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\update.ps1
 powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\check.ps1
 ```
+
+Proxy is disabled by default. If direct search-engine access times out, pass `-ProxyUrl "http://127.0.0.1:10808"` to `start.ps1` or `run.ps1`, and uncomment the `outgoing.proxies` block in `config\settings.yml`.
 
 Use `scripts/search.py` in this skill for quick JSON/table search checks:
 

@@ -60,7 +60,15 @@ if (Test-Path (Join-Path $Repo ".git")) {
 Set-Location $Repo
 & $Python -m pip install -U pip setuptools wheel
 & $Python -m pip install -r requirements.txt
-& $Python -m pip install --no-build-isolation -e .
+& $Python -m pip install -e .
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Editable install failed with build isolation; retrying without build isolation."
+    & $Python -m pip install --no-build-isolation -e .
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Editable install failed."
+        exit $LASTEXITCODE
+    }
+}
 
 Write-Host "Update finished."
 

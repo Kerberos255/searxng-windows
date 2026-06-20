@@ -8,7 +8,7 @@ This repository packages the practical Windows setup:
 
 - standard Python + venv, no Docker required
 - local-only SearXNG at `http://127.0.0.1:8888`
-- proxy-aware outbound search traffic
+- optional proxy-aware outbound search traffic
 - start, stop, update, check, and logon startup scripts
 - OpenClaw skill and config notes
 - Windows compatibility patch for SearXNG's Unix-only `pwd` import path
@@ -103,7 +103,11 @@ outgoing:
       - http://127.0.0.1:10808
 ```
 
-The `run.ps1` script also sets standard proxy environment variables. Change `127.0.0.1:10808` to match your local proxy, or remove the proxy settings if direct outbound access works.
+The `run.ps1` script can also set standard proxy environment variables. Proxy is disabled by default. Change `127.0.0.1:10808` to match your local proxy, then start with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1" -ProxyUrl "http://127.0.0.1:10808"
+```
 
 ## Engine Notes
 
@@ -120,3 +124,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Ro
 ```
 
 The task name is `OpenClaw SearXNG`.
+
+## License Notes
+
+This repository's deployment scripts and documentation are MIT licensed.
+
+SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. Any distribution that bundles SearXNG source code or modified SearXNG files must comply with SearXNG's upstream license.
