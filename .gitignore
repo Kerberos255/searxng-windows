@@ -1,0 +1,10 @@
+.venv/
+searxng/
+searxng-master*.zip
+_extract/
+*.log
+*.pid
+config/settings.yml
+*.bak*
+__pycache__/
+*.pyc

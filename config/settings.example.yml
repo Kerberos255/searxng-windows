@@ -1,0 +1,46 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "Local SearXNG"
+
+server:
+  bind_address: "127.0.0.1"
+  port: 8888
+  secret_key: "CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE"
+  base_url: false
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  method: "POST"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 20.0
+  extra_proxy_timeout: 10
+  proxies:
+    all://:
+      - http://127.0.0.1:10808
+
+ui:
+  static_use_hash: true
+  default_locale: "zh-Hans-CN"
+  query_in_title: false
+  infinite_scroll: false
+
+engines:
+  - name: duckduckgo
+    disabled: true
+  - name: duckduckgo images
+    disabled: true
+  - name: duckduckgo videos
+    disabled: true
+  - name: duckduckgo news
+    disabled: true
