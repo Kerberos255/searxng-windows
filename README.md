@@ -50,6 +50,16 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
 ```
 
+## One-File Installer
+
+Download `install-searxng-windows.ps1` from the latest release, review it, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-searxng-windows.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
+```
+
+The bootstrap installer downloads this repository's release source archive, then runs `scripts\install.ps1`. It does not bundle SearXNG, Python, a venv, or patched SearXNG source.
+
 ## OpenClaw Integration
 
 Set OpenClaw web search provider to `searxng`, and configure:

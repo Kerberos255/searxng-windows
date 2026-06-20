@@ -50,6 +50,16 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
 ```
 
+## 单文件安装器
+
+从最新 Release 下载 `install-searxng-windows.ps1`，建议先查看内容，再运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-searxng-windows.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
+```
+
+这个 bootstrap 安装器会下载本仓库的 Release 源码包，然后运行 `scripts\install.ps1`。它不捆绑 SearXNG、Python、venv 或已打补丁的 SearXNG 源码。
+
 ## OpenClaw 集成
 
 把 OpenClaw 的网页搜索 provider 设置成 `searxng`：

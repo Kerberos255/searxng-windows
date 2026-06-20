@@ -13,7 +13,10 @@ jobs:
       - name: Check PowerShell syntax
         shell: pwsh
         run: |
-          $scripts = Get-ChildItem -Path scripts -Filter *.ps1
+          $scripts = @(
+            Get-Item -Path install-searxng-windows.ps1
+            Get-ChildItem -Path scripts -Filter *.ps1
+          )
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null
