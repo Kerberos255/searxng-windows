@@ -1,5 +1,7 @@
 # SearXNG Windows for OpenClaw
 
+English | [简体中文](README.zh-CN.md)
+
 Native Windows deployment scripts for running a local SearXNG instance behind OpenClaw.
 
 This repository packages the practical Windows setup:
@@ -31,17 +33,19 @@ This repo intentionally does not include:
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-4. Install:
+4. Choose a deployment root. Examples below use `$env:USERPROFILE\Apps\searxng-windows`.
+
+5. Install:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root E:\openclaw\searxng_windows -RuntimePython E:\openclaw\runtime\python\python.exe
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows" -RuntimePython "<python.exe>"
 ```
 
-5. Start and check:
+6. Start and check:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\start.ps1
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\check.ps1
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
 ```
 
 ## OpenClaw Integration
@@ -99,7 +103,7 @@ outgoing:
       - http://127.0.0.1:10808
 ```
 
-The `run.ps1` script also sets standard proxy environment variables.
+The `run.ps1` script also sets standard proxy environment variables. Change `127.0.0.1:10808` to match your local proxy, or remove the proxy settings if direct outbound access works.
 
 ## Engine Notes
 
@@ -112,7 +116,7 @@ DuckDuckGo can hit CAPTCHA frequently behind shared/proxied traffic, so this set
 Register Windows logon startup:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Root E:\openclaw\searxng_windows
+powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
 ```
 
 The task name is `OpenClaw SearXNG`.

@@ -1,6 +1,6 @@
 param(
-    [string]$Root = "E:\openclaw\searxng_windows",
-    [string]$RuntimePython = "E:\openclaw\runtime\python\python.exe"
+    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
+    [string]$RuntimePython = "python"
 )
 
 $ErrorActionPreference = "Stop"

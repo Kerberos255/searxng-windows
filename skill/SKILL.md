@@ -1,40 +1,39 @@
 ---
 name: searxng
-description: Use when Codex needs to operate, diagnose, maintain, or query the local Windows SearXNG deployment for OpenClaw at E:\openclaw\searxng_windows, including web search via the local JSON API, start/stop/update scripts, proxy troubleshooting, OpenClaw integration, engine enable/disable decisions, and startup task management.
+description: Use when Codex needs to operate, diagnose, maintain, or query a local Windows SearXNG deployment for OpenClaw, including web search via the local JSON API, start/stop/update scripts, proxy troubleshooting, OpenClaw integration, engine enable/disable decisions, and startup task management.
 ---
 
 # Local SearXNG for OpenClaw
 
 This skill covers the local Windows SearXNG instance deployed for OpenClaw.
 
-## Fixed Paths
+## Path Conventions
 
-- Deployment root: `E:\openclaw\searxng_windows`
-- Source: `E:\openclaw\searxng_windows\searxng`
-- Virtualenv Python: `E:\openclaw\searxng_windows\.venv\Scripts\python.exe`
-- Runtime Python used to create the venv: `E:\openclaw\runtime\python\python.exe`
-- SearXNG config: `E:\openclaw\searxng_windows\config\settings.yml`
-- OpenClaw config: `E:\openclaw\.openclaw\openclaw.json`
-- OpenClaw launcher: `E:\openclaw\openclaw.cmd`
+- Deployment root: `<deploy-root>`
+- Source: `<deploy-root>\searxng`
+- Virtualenv Python: `<deploy-root>\.venv\Scripts\python.exe`
+- SearXNG config: `<deploy-root>\config\settings.yml`
+- OpenClaw config: `<openclaw-home>\.openclaw\openclaw.json`
+- OpenClaw launcher: `<openclaw-home>\openclaw.cmd`
 - Local URL: `http://127.0.0.1:8888`
-- Proxy used for outbound search-engine traffic: `http://127.0.0.1:10808`
+- Example local proxy for outbound search-engine traffic: `http://127.0.0.1:10808`
 
 ## Core Commands
 
 Use these scripts instead of launching `searx\webapp.py` manually:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\start.ps1
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\stop.ps1
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\update.ps1
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\check.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\start.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\stop.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\update.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\check.ps1
 ```
 
 Use `scripts/search.py` in this skill for quick JSON/table search checks:
 
 ```powershell
 $env:SEARXNG_URL='http://127.0.0.1:8888'
-E:\openclaw\runtime\python\python.exe E:\openclaw\.openclaw\skills\searxng\scripts\search.py search "openai" --format json -n 3
+python <skill-root>\scripts\search.py search "openai" --format json -n 3
 ```
 
 ## Current Deployment Facts
@@ -77,7 +76,7 @@ And plugin config:
 }
 ```
 
-`E:\openclaw\openclaw.cmd` should also set:
+The OpenClaw launcher should also set:
 
 ```cmd
 set "SEARXNG_URL=http://127.0.0.1:8888"
@@ -86,7 +85,7 @@ set "SEARXNG_URL=http://127.0.0.1:8888"
 Restart OpenClaw Gateway after config changes:
 
 ```powershell
-E:\openclaw\restart-openclaw.cmd
+<openclaw-home>\restart-openclaw.cmd
 ```
 
 ## Search Behavior
@@ -114,7 +113,7 @@ Brave in SearXNG does not use the official Brave API. It scrapes `https://search
 1. Check local API health:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\check.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\check.ps1
 ```
 
 2. Confirm actual results, not only HTTP 200:
@@ -129,8 +128,8 @@ $j.unresponsive_engines
 3. Inspect logs:
 
 ```powershell
-Get-Content E:\openclaw\searxng_windows\searxng-run.log -Tail 80
-Get-Content E:\openclaw\searxng_windows\searxng-run.err.log -Tail 120
+Get-Content <deploy-root>\searxng-run.log -Tail 80
+Get-Content <deploy-root>\searxng-run.err.log -Tail 120
 ```
 
 4. Confirm listener and process:

@@ -1,5 +1,5 @@
 param(
-    [string]$Root = "E:\openclaw\searxng_windows",
+    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
     [string]$ProxyUrl = "http://127.0.0.1:10808"
 )
 

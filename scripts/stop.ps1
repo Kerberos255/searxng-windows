@@ -1,5 +1,5 @@
 param(
-    [string]$Root = "E:\openclaw\searxng_windows"
+    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows"
 )
 
 $ErrorActionPreference = "Continue"

@@ -3,7 +3,7 @@
 ## Directory Layout
 
 ```text
-E:\openclaw\searxng_windows\
+<deploy-root>\
   .venv\
   config\settings.yml
   scripts\
@@ -94,8 +94,8 @@ Recompute counts with:
 @'
 import yaml
 from pathlib import Path
-base = Path(r'E:\openclaw\searxng_windows\searxng\searx\settings.yml')
-local = Path(r'E:\openclaw\searxng_windows\config\settings.yml')
+base = Path(r'<deploy-root>\searxng\searx\settings.yml')
+local = Path(r'<deploy-root>\config\settings.yml')
 base_cfg = yaml.safe_load(base.read_text(encoding='utf-8'))
 local_cfg = yaml.safe_load(local.read_text(encoding='utf-8'))
 engines = [e for e in base_cfg.get('engines', []) if isinstance(e, dict) and e.get('name')]
@@ -111,7 +111,7 @@ for e in engines:
     else:
         active += 1
 print(len(engines), active, disabled, inactive)
-'@ | E:\openclaw\searxng_windows\.venv\Scripts\python.exe -
+'@ | <deploy-root>\.venv\Scripts\python.exe -
 ```
 
 ## Startup Task
@@ -120,7 +120,7 @@ Scheduled Task:
 
 - Name: `OpenClaw SearXNG`
 - Trigger: user logon
-- Action: `wscript.exe "E:\openclaw\searxng_windows\scripts\start-hidden.vbs"`
+- Action: `wscript.exe "<deploy-root>\scripts\start-hidden.vbs"`
 
 Check it:
 
@@ -160,13 +160,13 @@ SearXNG's Brave engine scrapes HTML, not the official API. It can return `Too ma
 Run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\openclaw\searxng_windows\scripts\apply-windows-patch.ps1
+powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\apply-windows-patch.ps1
 ```
 
 ### OpenClaw still uses old search provider
 
-Check `E:\openclaw\.openclaw\openclaw.json`, `E:\openclaw\openclaw.cmd`, then restart:
+Check `<openclaw-home>\.openclaw\openclaw.json`, `<openclaw-home>\openclaw.cmd`, then restart:
 
 ```powershell
-E:\openclaw\restart-openclaw.cmd
+<openclaw-home>\restart-openclaw.cmd
 ```
