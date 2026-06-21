@@ -2,7 +2,7 @@ param(
     [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
     [string]$RuntimePython = "python",
     [string]$Repo = "Kerberos255/searxng-windows",
-    [string]$Ref = "v0.1.0-alpha"
+    [string]$Ref = "v0.1.0"
 )
 
 $ErrorActionPreference = "Stop"

@@ -23,19 +23,36 @@
 - 真实 `settings.yml` 里的密钥
 - 私有 OpenClaw 配置
 
-## 快速开始
+## 普通用户快速开始
 
-1. 安装或准备 Python 3.11/3.12 x64。
-2. 把 `config/settings.example.yml` 复制到部署目录的 `config/settings.yml`。
-3. 把 `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` 替换成随机 secret：
+1. 安装 Python 3.11 或 3.12 x64。
+2. 从最新 Release 下载 `install-searxng-windows.cmd` 和 `install-searxng-windows.ps1`，并放在同一个文件夹里。
+3. 双击 `install-searxng-windows.cmd`。
+4. 启动并检查 SearXNG：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
+```
+
+打开：
+
+```text
+http://127.0.0.1:8888
+```
+
+默认部署目录是 `$env:USERPROFILE\Apps\searxng-windows`。
+
+## 从 Git 仓库高级安装
+
+1. 把 `config/settings.example.yml` 复制到部署目录的 `config/settings.yml`。
+2. 把 `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` 替换成随机 secret：
 
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-4. 选择部署目录。下面示例使用 `$env:USERPROFILE\Apps\searxng-windows`。
-
-5. 安装：
+3. 安装：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
@@ -43,22 +60,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERP
 
 如果系统 PATH 里没有可用的 `python` 命令，可以用 `-RuntimePython` 传入完整 Python 路径。
 
-6. 启动并检查：
+## Bootstrap 安装器
 
-```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
-```
+普通用户可以双击 `install-searxng-windows.cmd`。高级用户可以先查看 `install-searxng-windows.ps1` 的内容，再在 PowerShell 里直接运行。
 
-## 单文件安装器
-
-从最新 Release 下载 `install-searxng-windows.ps1`，建议先查看内容，再运行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install-searxng-windows.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
-```
-
-这个 bootstrap 安装器会下载本仓库的 Release 源码包，然后运行 `scripts\install.ps1`。它不捆绑 SearXNG、Python、venv 或已打补丁的 SearXNG 源码。
+这个 bootstrap 安装器会下载本仓库的 Release 源码包，然后运行 `scripts\install.ps1`。后者会在安装过程中自动下载上游官方 SearXNG。本仓库不捆绑 SearXNG、Python、venv 或已打补丁的 SearXNG 源码。
 
 ## OpenClaw 集成
 

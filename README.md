@@ -23,19 +23,36 @@ This repo intentionally does not include:
 - real `settings.yml` secrets
 - private OpenClaw config files
 
-## Quick Start
+## Quick Start for Normal Users
 
-1. Install or provide Python 3.11/3.12 x64.
-2. Copy `config/settings.example.yml` to your deployment config path as `config/settings.yml`.
-3. Replace `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` with a generated secret:
+1. Install Python 3.11 or 3.12 x64.
+2. Download `install-searxng-windows.cmd` and `install-searxng-windows.ps1` from the latest release into the same folder.
+3. Double-click `install-searxng-windows.cmd`.
+4. Start and check SearXNG:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
+```
+
+Open:
+
+```text
+http://127.0.0.1:8888
+```
+
+The default deployment root is `$env:USERPROFILE\Apps\searxng-windows`.
+
+## Advanced Install From a Git Clone
+
+1. Copy `config/settings.example.yml` to your deployment config path as `config/settings.yml`.
+2. Replace `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` with a generated secret:
 
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-4. Choose a deployment root. Examples below use `$env:USERPROFILE\Apps\searxng-windows`.
-
-5. Install:
+3. Install:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
@@ -43,22 +60,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERP
 
 If Python is not available as `python` in `PATH`, pass a full Python path with `-RuntimePython`.
 
-6. Start and check:
+## Bootstrap Installer
 
-```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
-```
+Normal users can double-click `install-searxng-windows.cmd`. Advanced users can review and run `install-searxng-windows.ps1` directly in PowerShell.
 
-## One-File Installer
-
-Download `install-searxng-windows.ps1` from the latest release, review it, then run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install-searxng-windows.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
-```
-
-The bootstrap installer downloads this repository's release source archive, then runs `scripts\install.ps1`. It does not bundle SearXNG, Python, a venv, or patched SearXNG source.
+The bootstrap installer downloads this repository's release source archive, then runs `scripts\install.ps1`. That script downloads upstream SearXNG during installation. This repository does not bundle SearXNG, Python, a venv, or patched SearXNG source.
 
 ## OpenClaw Integration
 
