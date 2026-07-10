@@ -2,13 +2,20 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
   validate:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Check PowerShell syntax
         shell: pwsh
@@ -36,6 +43,11 @@ jobs:
           )
           $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
           python -m py_compile @pythonFiles
+
+      - name: Build release candidate (dry run)
+        shell: pwsh
+        run: |
+          .\scripts\build-release.ps1 -Tag "v0.0.0-ci" -OutputDir "$env:RUNNER_TEMP\release-smoke"
 
       - name: Run API Pool tests
         shell: pwsh

@@ -2,75 +2,56 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Native Windows deployment scripts for running a local SearXNG instance behind OpenClaw.
+A native Windows installer and maintenance toolkit for running a private local
+SearXNG instance for OpenClaw. Docker is not required.
 
-This repository packages the practical Windows setup:
+## Highlights
 
-- standard Python + venv, no Docker required
-- local-only SearXNG at `http://127.0.0.1:8888`
-- optional proxy-aware outbound search traffic
-- start, stop, update, check, and logon startup scripts
-- OpenClaw skill and config notes
-- Windows compatibility patch for SearXNG's Unix-only `pwd` import path
-- optional serial API Pool with Brave, Firecrawl, Tavily, and Parallel
+- Runs locally at `http://127.0.0.1:8888`
+- Uses standard Python and a virtual environment
+- Supports optional outbound proxy settings
+- Includes install, start, stop, update, health-check, and logon-startup scripts
+- Applies the required Windows compatibility patch automatically
+- Includes an optional API Pool for Brave, Firecrawl, Tavily, and Parallel
+- Keeps API keys, local state, logs, and generated configuration out of Git
 
-## What This Repo Does Not Include
+## Requirements
 
-This repo intentionally does not include:
+- Windows 10 or Windows 11
+- Python 3.11 or 3.12 x64
+- Internet access during installation
+- Git is optional; the installer falls back to source ZIP downloads
 
-- a Python virtual environment
-- a copied SearXNG source tree
-- logs, PID files, or downloaded source zips
-- real `settings.yml` secrets
-- private OpenClaw config files
-- real API Pool keys, local SQLite state, or `config/api-pool.env`
+## Quick Start
 
-## Quick Start for Normal Users
-
-1. Install Python 3.11 or 3.12 x64.
-2. Download `install-searxng-windows.cmd` and `install-searxng-windows.ps1` from the latest release into the same folder.
-3. Double-click `install-searxng-windows.cmd`.
-4. Start and check SearXNG:
+1. Download these two files from the latest GitHub Release into the same folder:
+   - `install-searxng-windows.cmd`
+   - `install-searxng-windows.ps1`
+2. Double-click `install-searxng-windows.cmd`.
+3. Start SearXNG and run the health check:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
 ```
 
-Open:
+4. Open `http://127.0.0.1:8888`.
+
+The default installation directory is:
 
 ```text
-http://127.0.0.1:8888
+%USERPROFILE%\Apps\searxng-windows
 ```
 
-The default deployment root is `$env:USERPROFILE\Apps\searxng-windows`.
-
-## Advanced Install From a Git Clone
-
-1. Copy `config/settings.example.yml` to your deployment config path as `config/settings.yml`.
-2. Replace `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` with a generated secret:
-
-```powershell
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-3. Install:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
-```
-
-If Python is not available as `python` in `PATH`, pass a full Python path with `-RuntimePython`.
-
-## Bootstrap Installer
-
-Normal users can double-click `install-searxng-windows.cmd`. Advanced users can review and run `install-searxng-windows.ps1` directly in PowerShell.
-
-The bootstrap installer downloads this repository's release source archive, then runs `scripts\install.ps1`. That script downloads upstream SearXNG during installation. This repository does not bundle SearXNG, Python, a venv, or patched SearXNG source.
+The bootstrap installer resolves the latest Release by default, downloads that
+package and upstream SearXNG, creates a virtual environment, installs
+dependencies, generates a local
+`secret_key`, and applies the Windows patches. Existing `config/settings.yml`
+and `config/api-pool.env` files are preserved.
 
 ## OpenClaw Integration
 
-Set OpenClaw web search provider to `searxng`, and configure:
+Configure OpenClaw to use the local SearXNG endpoint:
 
 ```json
 {
@@ -101,17 +82,50 @@ Set OpenClaw web search provider to `searxng`, and configure:
 }
 ```
 
-Also set this in the OpenClaw launcher environment:
+Also set the launcher environment variable:
 
 ```cmd
 set "SEARXNG_URL=http://127.0.0.1:8888"
 ```
 
-Restart OpenClaw after config changes.
+Restart OpenClaw after changing its configuration.
 
-## Proxy Notes
+## Optional API Pool
 
-If direct outbound access to search engines times out, configure SearXNG outbound proxy in `settings.yml`:
+The API Pool is installed but **disabled by default**. While disabled, its local
+Broker is not started and normal SearXNG engines work as usual.
+
+To enable it:
+
+1. Edit `%USERPROFILE%\Apps\searxng-windows\config\settings.yml`.
+2. Change the `api pool` entry from `disabled: true` to `disabled: false`.
+3. Add at least one key to `config\api-pool.env`:
+
+```dotenv
+BRAVE_API_KEY=
+FIRECRAWL_API_KEY=
+TAVILY_API_KEY=
+PARALLEL_API_KEY=
+API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+```
+
+4. Restart SearXNG.
+
+The Broker listens only on `http://127.0.0.1:8890` and tries configured
+providers serially:
+
+```text
+Brave -> Firecrawl -> Tavily -> Parallel
+```
+
+It stops after the first successful provider, so one search does not consume all
+configured quotas. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
+state, and fallback details.
+
+## Proxy Configuration
+
+Proxy use is disabled by default. If outbound searches time out, edit
+`config/settings.yml` and enable the example proxy block:
 
 ```yaml
 outgoing:
@@ -123,74 +137,94 @@ outgoing:
       - http://127.0.0.1:10808
 ```
 
-The `run.ps1` script can also set standard proxy environment variables. Proxy is disabled by default. Change `127.0.0.1:10808` to match your local proxy, then start with:
+Replace the address with your proxy. Pass the same proxy to the launcher so the
+API Pool and supporting tools receive standard proxy environment variables:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1" -ProxyUrl "http://127.0.0.1:10808"
 ```
 
-## Optional API Pool
-
-The installer includes the API Pool code, but it is disabled by default and the Broker is not started.
-SearXNG sees it as one `api pool` engine, while the Broker tries providers in this
-order by default:
-
-```text
-Brave -> Firecrawl -> Tavily -> Parallel
-```
-
-Enable it explicitly by changing the `api pool` entry in
-`config/settings.yml` from `disabled: true` to `disabled: false`, then add at
-least one API key to `config/api-pool.env` and restart SearXNG.
-
-Only the first successful provider is used. Quota exhaustion, rate limits, and
-transient failures automatically fall through to the next configured provider.
-When the engine remains disabled, the Broker is skipped entirely and ordinary
-SearXNG free-web engines continue normally.
-
-Edit the installed file:
-
-```text
-%USERPROFILE%\Apps\searxng-windows\config\api-pool.env
-```
-
-Available variables:
-
-```dotenv
-BRAVE_API_KEY=
-FIRECRAWL_API_KEY=
-TAVILY_API_KEY=
-PARALLEL_API_KEY=
-API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
-```
-
-The real env file and local SQLite state are excluded from Git. See
-[`api_pool/README.md`](api_pool/README.md) for status behavior and testing details.
-
-## Engine Notes
-
-SearXNG queries engines concurrently. One failing engine should not block other engines from returning results; failures appear in `unresponsive_engines`.
-
-DuckDuckGo can hit CAPTCHA frequently behind shared/proxied traffic, so this setup disables DuckDuckGo variants by default. Brave in SearXNG scrapes `search.brave.com` HTML and does not use the official Brave API key; it can still be rate-limited.
-
-## Startup
-
-Register Windows logon startup:
+## Common Operations
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
+$Root = "$env:USERPROFILE\Apps\searxng-windows"
+
+# Start SearXNG and the optional API Pool when enabled
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\start.ps1"
+
+# Stop local services
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\stop.ps1"
+
+# Check service status and perform a test search
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\check.ps1"
+
+# Update the downloaded upstream SearXNG source and dependencies
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\update.ps1"
+
+# Register startup at Windows logon
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\register-startup-task.ps1" -Root $Root
 ```
 
-The task name is `OpenClaw SearXNG`.
+`update.ps1` updates upstream SearXNG. To update this repository's Windows
+scripts, API Pool code, and templates, rerun the installer files from the latest
+Release; existing local configuration is retained.
 
-## CI
+## Advanced Installation from a Git Clone
 
-GitHub Actions validates PowerShell syntax, compiles all Python sources, and runs the mocked API Pool test suite on push and pull requests.
+```powershell
+git clone https://github.com/Kerberos255/searxng-windows.git
+cd searxng-windows
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
+```
 
-## License Notes
+The install script creates `config/settings.yml` and generates its local secret
+automatically when the file does not already exist. Use `-RuntimePython` with a
+full executable path when `python` is not available in `PATH`. The bootstrap
+installer accepts `-Ref v0.2.0` when a specific release must be pinned.
 
-This repository's deployment scripts and documentation are MIT licensed.
+## Troubleshooting
 
-SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. The Windows compatibility patch and the small `patches/api_pool.py` SearXNG engine adapter are applied locally to the downloaded SearXNG source tree during installation/update. The adapter is marked AGPL-3.0-or-later; the standalone Broker and deployment scripts remain MIT licensed. This repository does not redistribute a complete patched SearXNG source tree.
+Run `scripts\check.ps1` first. Useful logs in the installation directory are:
 
-Any distribution that bundles SearXNG source code or modified SearXNG files must comply with SearXNG's upstream license.
+```text
+searxng-run.log
+searxng-run.err.log
+broker-run.log
+broker-run.err.log
+```
+
+- Port `8888` is SearXNG; port `8890` is the optional API Pool Broker.
+- A failed search engine does not normally block results from other engines.
+- DuckDuckGo variants are disabled in the template because shared or proxied
+  traffic frequently triggers CAPTCHA challenges.
+- The SearXNG Brave engine scrapes Brave's public results and does not use the
+  official Brave API key. The API Pool's Brave provider does use that key.
+
+## Repository Boundaries
+
+This repository intentionally does not contain:
+
+- a virtual environment or a copied SearXNG source tree
+- generated `config/settings.yml` or real API keys
+- `config/api-pool.env`, SQLite state, logs, PID files, or downloaded archives
+- private OpenClaw configuration
+
+## CI and Releases
+
+Pushes and pull requests run the Windows CI checks: PowerShell parsing, Python
+compilation, API Pool tests, and public-package safety checks.
+
+Pushing a semantic version tag such as `v0.2.0` triggers the Release workflow.
+It repeats validation, verifies that the tagged commit belongs to `main`, builds
+the release ZIP and bootstrap installers, generates SHA-256 checksums, and then
+creates the GitHub Release automatically.
+
+## License
+
+The deployment scripts, standalone API Pool Broker, and documentation are MIT
+licensed.
+
+SearXNG is downloaded from its upstream project and is licensed under
+AGPL-3.0-or-later. The small `patches/api_pool.py` SearXNG engine adapter is also
+marked AGPL-3.0-or-later. Distributions that bundle SearXNG source or modified
+SearXNG files must comply with its upstream license.

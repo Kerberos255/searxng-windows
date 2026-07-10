@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate tag and source branch
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Release tags must use semantic version format such as v0.2.0."
+          }
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "The tagged commit is not contained in origin/main."
+          }
+
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $scripts = @(
+            Get-Item -Path install-searxng-windows.ps1
+            Get-ChildItem -Path scripts -Filter *.ps1
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              throw "PowerShell syntax errors in $($script.FullName): $($errors | Out-String)"
+            }
+          }
+
+      - name: Check Python syntax
+        shell: pwsh
+        run: |
+          $pythonFiles = @(
+            "skill/scripts/search.py"
+            "skill/scripts/searxng.py"
+            "patches/api_pool.py"
+          )
+          $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
+          python -m py_compile @pythonFiles
+
+      - name: Run API Pool tests
+        shell: pwsh
+        run: |
+          python -m pip install -r api_pool/requirements.txt
+          python -m unittest discover -s api_pool/tests -v
+
+  publish:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release assets
+        shell: pwsh
+        run: |
+          .\scripts\build-release.ps1 -Tag $env:GITHUB_REF_NAME -OutputDir "dist"
+
+      - name: Upload release candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $Assets = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
+          gh release create $env:GITHUB_REF_NAME $Assets `
+            --verify-tag `
+            --latest `
+            --generate-notes `
+            --title $env:GITHUB_REF_NAME

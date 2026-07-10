@@ -99,5 +99,24 @@ class TestPublicPackageSafety(unittest.TestCase):
         self.assertIn("Broker checks skipped", check)
 
 
+    def test_release_workflow_is_gated_by_validation(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn('tags:', workflow)
+        self.assertIn('"v*.*.*"', workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn("needs: validate", workflow)
+        self.assertIn("merge-base --is-ancestor", workflow)
+        self.assertIn("build-release.ps1", workflow)
+
+        builder = (REPO_ROOT / "scripts" / "build-release.ps1").read_text(encoding="utf-8")
+        self.assertIn("git archive", builder)
+        self.assertIn("Get-FileHash", builder)
+        self.assertIn("SHA256SUMS.txt", builder)
+
+        installer = (REPO_ROOT / "install-searxng-windows.ps1").read_text(encoding="utf-8")
+        self.assertIn("releases/latest", installer)
+        self.assertNotIn('[string]$Ref = "v0.1.0"', installer)
+
+
 if __name__ == "__main__":
     unittest.main()
