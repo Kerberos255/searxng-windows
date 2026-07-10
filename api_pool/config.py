@@ -22,7 +22,7 @@ _PROVIDER_KEY_ALIASES: dict[str, tuple[str, ...]] = {
     "parallel": ("PARALLEL_API_KEY",),
 }
 SUPPORTED_PROVIDERS = tuple(_PROVIDER_KEY_ALIASES)
-DEFAULT_PRIORITY = ["brave", "firecrawl", "tavily", "parallel"]
+DEFAULT_PRIORITY = ["parallel", "tavily", "brave", "firecrawl"]
 
 
 def _load_env_file() -> dict[str, str]:

@@ -47,7 +47,7 @@ class TestPublicConfiguration(unittest.TestCase):
                 self.assertFalse(config.is_provider_configured("brave"))
                 self.assertEqual(
                     config.get_priority(),
-                    ["firecrawl", "brave", "tavily", "parallel"],
+                    ["firecrawl", "brave", "parallel", "tavily"],
                 )
 
     def test_process_environment_precedes_file(self):
