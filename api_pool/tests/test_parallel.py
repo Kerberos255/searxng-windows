@@ -11,9 +11,12 @@ from api_pool.providers.parallel import search
 
 
 class TestParallelProvider(unittest.TestCase):
+    @patch("api_pool.providers.parallel._after_date_for_time_range", return_value="2026-06-10")
     @patch("api_pool.providers.parallel.config.get_parallel_key", return_value="test-key")
     @patch("api_pool.providers.parallel.get_http_client")
-    def test_advanced_request_schema_and_result_mapping(self, mock_get_client, _mock_key):
+    def test_advanced_request_schema_and_result_mapping(
+        self, mock_get_client, _mock_key, _mock_after_date
+    ):
         captured = {}
 
         def handler(request):
@@ -59,9 +62,23 @@ class TestParallelProvider(unittest.TestCase):
         self.assertIn("past month", captured["body"]["objective"])
         self.assertEqual(
             captured["body"]["advanced_settings"],
-            {"max_results": 7},
+            {
+                "max_results": 7,
+                "source_policy": {"after_date": "2026-06-10"},
+            },
         )
         self.assertNotIn("max_results", captured["body"])
+
+    def test_time_range_cutoffs(self):
+        from datetime import date
+        from api_pool.providers.parallel import _after_date_for_time_range
+
+        today = date(2026, 7, 10)
+        self.assertEqual(_after_date_for_time_range("day", today), "2026-07-09")
+        self.assertEqual(_after_date_for_time_range("week", today), "2026-07-03")
+        self.assertEqual(_after_date_for_time_range("month", today), "2026-06-09")
+        self.assertEqual(_after_date_for_time_range("year", today), "2025-07-10")
+        self.assertIsNone(_after_date_for_time_range(None, today))
 
     @patch("api_pool.providers.parallel.config.get_parallel_key", return_value="test-key")
     @patch("api_pool.providers.parallel.get_http_client")

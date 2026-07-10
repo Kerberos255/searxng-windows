@@ -4,6 +4,7 @@ Endpoint: POST https://api.parallel.ai/v1/search
 Documentation: https://docs.parallel.ai/api-reference/search/search
 """
 
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -11,8 +12,23 @@ import httpx
 from .base import get_http_client, ProviderResult, make_result_item
 from .. import config
 
-
 BASE_URL = "https://api.parallel.ai/v1/search"
+
+_TIME_RANGE_DAYS = {
+    "day": 1,
+    "week": 7,
+    "month": 31,
+    "year": 365,
+}
+
+
+def _after_date_for_time_range(time_range: Optional[str], today: date | None = None) -> str | None:
+    days = _TIME_RANGE_DAYS.get(time_range or "")
+    if days is None:
+        return None
+    current_date = today or datetime.now(timezone.utc).date()
+    return (current_date - timedelta(days=days)).isoformat()
+
 
 
 def search(
@@ -57,13 +73,18 @@ def search(
     if freshness:
         objective = (objective[: 5000 - len(freshness)] + freshness).strip()
 
+    advanced_settings = {
+        "max_results": min(max(max_results, 1), 20),
+    }
+    after_date = _after_date_for_time_range(time_range)
+    if after_date:
+        advanced_settings["source_policy"] = {"after_date": after_date}
+
     payload = {
         "search_queries": [search_query],
         "objective": objective,
         "mode": "advanced",
-        "advanced_settings": {
-            "max_results": min(max(max_results, 1), 20),
-        },
+        "advanced_settings": advanced_settings,
     }
 
     try:
