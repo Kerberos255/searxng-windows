@@ -5,6 +5,9 @@
 ```text
 <deploy-root>\
   .venv\
+  api_pool\
+  patches\api_pool.py
+  config\api-pool.env
   config\settings.yml
   scripts\
     apply-windows-patch.ps1
@@ -20,7 +23,24 @@
   searxng-run.log
   searxng-run.err.log
   searxng.pid
+  broker-run.log
+  broker-run.err.log
+  broker.pid
 ```
+
+## Optional API-First Gateway
+
+- `8888`: normal SearXNG UI and search API; this is the default OpenClaw target.
+- `8890`: optional API Pool gateway; it starts only when the `api pool` engine is
+  enabled in `config\settings.yml`.
+- Enabled provider order: `Parallel -> Tavily -> Brave -> Firecrawl`.
+- Free fallback engines: Bing, Sogou, Qwant, and Mojeek, called only after the
+  enabled API tier returns no results.
+- Exact filters: `date_after` and `date_before` in `YYYY-MM-DD` format.
+- API keys stay in `config\api-pool.env`; provider counters and cooldown state
+  stay in `api_pool\data\api_pool.sqlite`.
+- When the API Pool is disabled, OpenClaw remains on `8888` and uses ordinary
+  SearXNG directly.
 
 ## Important Config
 
@@ -35,7 +55,7 @@ server:
   limiter: false
   public_instance: false
   image_proxy: false
-  method: "POST"
+  method: "GET"
 
 search:
   safe_search: 0
@@ -57,6 +77,15 @@ ui:
   default_locale: "zh-Hans-CN"
 
 engines:
+  # Disabled by default. Enable this only when OpenClaw will use port 8890.
+  - name: api pool
+    engine: api_pool
+    disabled: true
+    enable_http: true
+    categories:
+      - general
+      - web
+
   - name: duckduckgo
     disabled: true
   - name: duckduckgo images

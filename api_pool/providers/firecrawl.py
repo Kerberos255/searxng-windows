@@ -1,5 +1,6 @@
 """Firecrawl v2 Search API provider."""
 
+from datetime import date
 from typing import Optional
 
 import httpx
@@ -15,6 +16,8 @@ def search(
     query: str,
     pageno: int = 1,
     time_range: Optional[str] = None,
+    date_after: Optional[str] = None,
+    date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
 ) -> ProviderResult:
@@ -48,7 +51,15 @@ def search(
         "month": "qdr:m",
         "year": "qdr:y",
     }
-    if time_range in time_range_map:
+    if date_after or date_before:
+        start_date = date.fromisoformat(date_after or "1970-01-01")
+        end_date = date.fromisoformat(date_before or date.today().isoformat())
+        payload["tbs"] = (
+            "cdr:1,cd_min:"
+            f"{start_date.strftime('%m/%d/%Y')},"
+            f"cd_max:{end_date.strftime('%m/%d/%Y')}"
+        )
+    elif time_range in time_range_map:
         payload["tbs"] = time_range_map[time_range]
 
     headers = {

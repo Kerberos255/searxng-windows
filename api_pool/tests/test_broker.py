@@ -179,6 +179,12 @@ class TestBrokerErrors(BrokerTestBase):
         resp = self._search(time_range="invalid")
         self.assertEqual(resp.status_code, 400)
 
+    def test_invalid_exact_dates(self):
+        resp = self._search(date_after="2026-99-01")
+        self.assertEqual(resp.status_code, 400)
+        resp = self._search(date_after="2026-07-10", date_before="2026-07-01")
+        self.assertEqual(resp.status_code, 400)
+
     def test_all_providers_unconfigured(self):
         """Test all APIs unconfigured -> empty results."""
         for prov in ["brave", "tavily", "parallel"]:
@@ -538,7 +544,15 @@ class TestSearchParamsPassthrough(BrokerTestBase):
             http_status=200,
         )
 
-        resp = self._search(query="hello world", pageno=2, time_range="week", safesearch=1, max_results=5)
+        resp = self._search(
+            query="hello world",
+            pageno=2,
+            time_range="week",
+            date_after="2026-07-01",
+            date_before="2026-07-10",
+            safesearch=1,
+            max_results=5,
+        )
         data = resp.get_json()
         self.assertEqual(data["provider"], "brave")
 
@@ -547,6 +561,8 @@ class TestSearchParamsPassthrough(BrokerTestBase):
         call_kwargs = mock_brave.call_args[1]
         self.assertEqual(call_kwargs.get("pageno"), 2)
         self.assertEqual(call_kwargs.get("time_range"), "week")
+        self.assertEqual(call_kwargs.get("date_after"), "2026-07-01")
+        self.assertEqual(call_kwargs.get("date_before"), "2026-07-10")
         self.assertEqual(call_kwargs.get("safesearch"), 1)
         self.assertEqual(call_kwargs.get("max_results"), 5)
 
@@ -577,7 +593,12 @@ class TestTavilyAuth(BrokerTestBase):
 
         from api_pool.providers.tavily import search
 
-        result = search(query="hello tavily", max_results=5)
+        result = search(
+            query="hello tavily",
+            date_after="2026-07-01",
+            date_before="2026-07-10",
+            max_results=5,
+        )
 
         self.assertTrue(result.success)
         # Verify Bearer authorization header
@@ -588,6 +609,133 @@ class TestTavilyAuth(BrokerTestBase):
         self.assertNotIn("api_key", captured_body)
         self.assertEqual(captured_body["query"], "hello tavily")
         self.assertEqual(captured_body["search_depth"], "basic")
+        self.assertEqual(captured_body["start_date"], "2026-07-01")
+        self.assertEqual(captured_body["end_date"], "2026-07-10")
+
+
+class TestSearXNGCompatibleGateway(BrokerTestBase):
+    @patch("api_pool.config.get_priority", return_value=["parallel"])
+    @patch("api_pool.providers.parallel.search")
+    def test_get_search_is_api_first_and_passes_dates(self, mock_parallel, _mock_priority):
+        mock_parallel.return_value = ProviderResult(
+            success=True,
+            results=[
+                {
+                    "url": "https://parallel.example",
+                    "title": "Parallel",
+                    "content": "High quality result",
+                    "published_date": "2026-07-05",
+                }
+            ],
+            http_status=200,
+        )
+
+        resp = self.client.get(
+            "/search?q=hello&format=json&count=7&time_range=month"
+            "&date_after=2026-07-01"
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["provider"], "parallel")
+        self.assertFalse(data["fallback_used"])
+        self.assertEqual(data["number_of_results"], 1)
+        call_kwargs = mock_parallel.call_args.kwargs
+        self.assertEqual(call_kwargs["max_results"], 7)
+        self.assertEqual(call_kwargs["date_after"], "2026-07-01")
+        self.assertIsNone(call_kwargs["date_before"])
+
+    @patch("api_pool.config.get_priority", return_value=["parallel", "tavily"])
+    @patch("api_pool.providers.tavily.search")
+    @patch("api_pool.providers.parallel.search")
+    def test_date_before_skips_parallel_and_uses_tavily(
+        self, mock_parallel, mock_tavily, _mock_priority
+    ):
+        mock_tavily.return_value = ProviderResult(
+            success=True,
+            results=[{"url": "https://tavily.example", "title": "Tavily"}],
+            http_status=200,
+        )
+
+        resp = self.client.get(
+            "/search?q=hello&format=json&date_after=2026-07-01"
+            "&date_before=2026-07-10"
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["provider"], "tavily")
+        self.assertEqual(data["attempts"][0]["outcome"], "unsupported_date_before")
+        mock_parallel.assert_not_called()
+        self.assertEqual(mock_tavily.call_args.kwargs["date_before"], "2026-07-10")
+
+    @patch("api_pool.app._run_free_search")
+    @patch("api_pool.app._run_api_search")
+    def test_get_search_uses_free_tier_only_after_api_tier_is_empty(
+        self, mock_api_search, mock_free_search
+    ):
+        mock_api_search.return_value = {
+            "provider": None,
+            "results": [],
+            "attempts": [{"provider": "parallel", "outcome": "quota_exhausted"}],
+        }
+        mock_free_search.return_value = {
+            "query": "hello",
+            "provider": "searxng_free",
+            "results": [{"url": "https://free.example", "title": "Free"}],
+            "fallback_used": True,
+        }
+
+        resp = self.client.get("/search?q=hello&format=json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["provider"], "searxng_free")
+        mock_free_search.assert_called_once()
+
+    @patch("api_pool.app.httpx.Client")
+    def test_free_tier_queries_all_default_engines(self, mock_client_class):
+        response = MagicMock()
+        response.json.return_value = {"results": []}
+        client = MagicMock()
+        client.get.return_value = response
+        client_context = MagicMock()
+        client_context.__enter__.return_value = client
+        mock_client_class.return_value = client_context
+
+        search_input = {
+            "query": "hello",
+            "pageno": 1,
+            "time_range": None,
+            "date_after": None,
+            "date_before": None,
+            "safesearch": 0,
+            "max_results": 10,
+            "language": "",
+            "fallback_on_empty": True,
+        }
+        with broker_app.app.test_request_context(
+            "/search", base_url="http://127.0.0.1:8890"
+        ), patch.object(
+            config,
+            "SEARXNG_FREE_ENGINES",
+            ("bing", "sogou", "qwant", "mojeek"),
+        ):
+            broker_app._run_free_search(search_input, [])
+
+        params = client.get.call_args.kwargs["params"]
+        self.assertEqual(params["engines"], "bing,sogou,qwant,mojeek")
+
+    @patch("api_pool.app._run_api_search")
+    def test_gateway_blocks_recursive_free_backend(self, mock_api_search):
+        mock_api_search.return_value = {
+            "provider": None,
+            "results": [],
+            "attempts": [],
+        }
+        with patch.object(config, "SEARXNG_BACKEND_URL", "http://localhost"):
+            resp = self.client.get("/search?q=hello&format=json")
+        data = resp.get_json()
+        self.assertEqual(data["results"], [])
+        self.assertEqual(
+            data["attempts"][-1]["outcome"], "recursive_backend_blocked"
+        )
 
 
 class TestBraveDirectErrors(BrokerTestBase):
@@ -630,6 +778,31 @@ class TestBraveDirectErrors(BrokerTestBase):
         self.assertFalse(result.success)
         self.assertEqual(result.error_category, "connection_error")
         self.assertIsNone(result.http_status)
+
+    @patch("api_pool.providers.brave.get_http_client")
+    def test_brave_uses_official_freshness_parameters(self, mock_get_client):
+        import httpx
+        from urllib.parse import parse_qs, urlparse
+
+        captured = []
+
+        def handler(request):
+            captured.append(parse_qs(urlparse(str(request.url)).query))
+            return httpx.Response(200, json={"web": {"results": []}})
+
+        mock_transport_client = httpx.Client(transport=httpx.MockTransport(handler))
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_transport_client
+        mock_get_client.return_value = mock_cm
+
+        from api_pool.providers.brave import search
+
+        search(query="test", time_range="week")
+        search(query="test", date_after="2026-07-01", date_before="2026-07-10")
+
+        self.assertEqual(captured[0]["freshness"], ["pw"])
+        self.assertNotIn("time_range", captured[0])
+        self.assertEqual(captured[1]["freshness"], ["2026-07-01to2026-07-10"])
 
 
 class TestParallelHeaders(BrokerTestBase):

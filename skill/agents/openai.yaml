@@ -1,0 +1,4 @@
+interface:
+  display_name: "SearXNG Local Search"
+  short_description: "Operate and query a local Windows SearXNG service."
+  default_prompt: "Use $searxng to query or diagnose the local Windows SearXNG service, including its optional API Pool gateway."

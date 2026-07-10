@@ -51,7 +51,7 @@ and `config/api-pool.env` files are preserved.
 
 ## OpenClaw Integration
 
-Configure OpenClaw to use the local SearXNG endpoint:
+Configure OpenClaw to use the normal local SearXNG endpoint on port `8888`:
 
 ```json
 {
@@ -82,13 +82,16 @@ Configure OpenClaw to use the local SearXNG endpoint:
 }
 ```
 
-Also set the launcher environment variable:
+Also set the launcher environment variables:
 
 ```cmd
 set "SEARXNG_URL=http://127.0.0.1:8888"
+set "SEARXNG_BASE_URL=http://127.0.0.1:8888"
 ```
 
-Restart OpenClaw after changing its configuration.
+Restart OpenClaw after changing its configuration. Keep port `8888` while the
+API Pool is disabled. If you enable the API Pool below, switch all three URL
+settings to port `8890`.
 
 ## Optional API Pool
 
@@ -109,17 +112,25 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. Restart SearXNG.
+4. Change OpenClaw's `baseUrl`, `SEARXNG_URL`, and `SEARXNG_BASE_URL` from
+   port `8888` to `8890`.
+5. Restart SearXNG and OpenClaw.
 
-The Broker listens only on `http://127.0.0.1:8890` and tries configured
-providers serially:
+The Broker starts only while the API Pool is enabled. It listens on
+`http://127.0.0.1:8890`, exposes a SearXNG-compatible search endpoint for
+OpenClaw, and uses this sequence:
 
 ```text
-Parallel -> Tavily -> Brave -> Firecrawl
+Parallel -> Tavily -> Brave -> Firecrawl -> Bing/Sogou/Qwant/Mojeek free fallback
 ```
 
-It stops after the first successful provider, so one search does not consume all
-configured quotas. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
+It stops after the first API provider with results, so one search does not
+consume all configured quotas. Empty results continue to the next API provider.
+Only when the complete API tier is unavailable or empty does the gateway query
+the free Bing, Sogou, Qwant, and Mojeek engines through SearXNG on port `8888`.
+When the API Pool is disabled, OpenClaw should remain on port `8888` and use ordinary
+SearXNG directly. Exact filters use `date_after` and `date_before` in
+`YYYY-MM-DD` format. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
 state, and fallback details.
 
 ## Proxy Configuration

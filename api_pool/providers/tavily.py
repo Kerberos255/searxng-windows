@@ -19,6 +19,8 @@ def search(
     query: str,
     pageno: int = 1,
     time_range: Optional[str] = None,
+    date_after: Optional[str] = None,
+    date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
 ) -> ProviderResult:
@@ -27,7 +29,9 @@ def search(
     Args:
         query: Search query string.
         pageno: Unused (Tavily does not support pagination in basic mode).
-        time_range: Unused (Tavily does not expose time range in basic mode).
+        time_range: Relative range (day/week/month/year).
+        date_after: Exact inclusive start date in YYYY-MM-DD format.
+        date_before: Exact inclusive end date in YYYY-MM-DD format.
         safesearch: Unused.
         max_results: Number of results (max_results parameter).
 
@@ -42,6 +46,9 @@ def search(
             is_misconfigured=True,
         )
 
+    if pageno > 1:
+        return ProviderResult(success=True, results=[], http_status=200)
+
     payload = {
         "query": query,
         "search_depth": "basic",
@@ -49,6 +56,14 @@ def search(
         "include_raw_content": False,
         "max_results": min(max_results, 20),
     }
+    if date_after:
+        payload["start_date"] = date_after
+    if date_before:
+        payload["end_date"] = date_before
+    if time_range and not date_after and not date_before:
+        payload["time_range"] = time_range
+    if safesearch:
+        payload["safe_search"] = True
 
     try:
         with get_http_client() as client:
@@ -65,6 +80,8 @@ def search(
                         url=item.get("url", ""),
                         title=item.get("title", ""),
                         content=item.get("content", ""),
+                        published_date=item.get("published_date")
+                        or item.get("publishedDate"),
                         score=item.get("score"),
                     )
                 )

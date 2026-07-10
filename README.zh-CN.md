@@ -49,7 +49,7 @@ bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG
 
 ## OpenClaw 集成
 
-把 OpenClaw 的网页搜索后端设置为本机 SearXNG：
+默认把 OpenClaw 的网页搜索后端设置为 `8888` 端口上的普通 SearXNG：
 
 ```json
 {
@@ -84,9 +84,11 @@ bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG
 
 ```cmd
 set "SEARXNG_URL=http://127.0.0.1:8888"
+set "SEARXNG_BASE_URL=http://127.0.0.1:8888"
 ```
 
-修改后重启 OpenClaw。
+修改后重启 OpenClaw。API Pool 未启用时保持使用 `8888`；启用下面的 API
+Pool 后，再把上述三个 URL 改成 `8890`。
 
 ## 可选 API Pool
 
@@ -107,17 +109,23 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. 重启 SearXNG。
+4. 把 OpenClaw 的 `baseUrl`、`SEARXNG_URL` 和 `SEARXNG_BASE_URL` 从
+   `8888` 改成 `8890`。
+5. 重启 SearXNG 和 OpenClaw。
 
-Broker 只监听 `http://127.0.0.1:8890`，并按下面的顺序串行尝试已配置的
-provider：
+Broker 只在 API Pool 启用时启动，监听 `http://127.0.0.1:8890`，为 OpenClaw
+提供兼容 SearXNG 的搜索入口，并按以下顺序执行：
 
 ```text
-Parallel → Tavily → Brave → Firecrawl
+Parallel → Tavily → Brave → Firecrawl → Bing/Sogou/Qwant/Mojeek 免费兜底
 ```
 
-第一家成功后立即停止，不会让一次搜索同时消耗所有 API 的额度。接口、状态机
-和故障切换说明见 [`api_pool/README.md`](api_pool/README.md)。
+第一家 API 返回有效结果后立即停止，不会让一次搜索同时消耗所有 API 的额度；
+空结果会继续尝试下一家。只有全部 API 都不可用或都没有结果时，网关才会调用
+`8888` 上的 Bing、Sogou、Qwant、Mojeek 免费层。API Pool 未启用时，OpenClaw 应继续连接
+`8888`，直接使用普通 SearXNG。精确日期筛选使用 `date_after`、`date_before`
+和 `YYYY-MM-DD` 格式。接口、状态机和故障切换说明见
+[`api_pool/README.md`](api_pool/README.md)。
 
 ## 代理配置
 

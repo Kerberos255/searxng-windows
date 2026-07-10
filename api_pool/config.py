@@ -102,3 +102,26 @@ COOLDOWN_BASE_SECONDS = int(os.environ.get("API_POOL_COOLDOWN_SECONDS", "120"))
 QUOTA_PROBE_INTERVAL_SECONDS = int(os.environ.get("API_POOL_QUOTA_PROBE_SECONDS", "86400"))
 MAX_CONSECUTIVE_FAILURES = 5
 PROVIDER_REQUEST_TIMEOUT = float(os.environ.get("API_POOL_PROVIDER_TIMEOUT", "15"))
+
+SEARXNG_BACKEND_URL = os.environ.get(
+    "SEARXNG_BACKEND_URL", "http://127.0.0.1:8888"
+).rstrip("/")
+_configured_free_engines = tuple(
+    engine.strip()
+    for engine in os.environ.get(
+        "SEARXNG_FREE_ENGINES", "bing,sogou,qwant,mojeek"
+    ).split(",")
+    if engine.strip() and engine.strip().lower() not in ("api pool", "api_pool")
+)
+SEARXNG_FREE_ENGINES = _configured_free_engines or (
+    "bing",
+    "sogou",
+    "qwant",
+    "mojeek",
+)
+SEARXNG_FREE_FALLBACK = os.environ.get(
+    "SEARXNG_FREE_FALLBACK", "true"
+).strip().lower() in ("1", "true", "yes", "on")
+SEARXNG_FALLBACK_TIMEOUT = float(
+    os.environ.get("SEARXNG_FALLBACK_TIMEOUT", "20")
+)

@@ -27,18 +27,14 @@ if ($ApiPoolEnabled) {
             Write-Host " - $($Provider.provider): configured=$($Provider.configured), status=$($Provider.status)"
         }
 
-        $BrokerBody = @{
-            query = "open source metasearch"
-            max_results = 3
-        } | ConvertTo-Json
+        $BrokerQuery = [uri]::EscapeDataString("open source metasearch")
         $BrokerSearch = Invoke-RestMethod `
-            -Uri "$BrokerUrl/search" `
-            -Method Post `
-            -ContentType "application/json" `
-            -Body $BrokerBody `
-            -TimeoutSec 30
+            -Uri "$BrokerUrl/search?q=$BrokerQuery&format=json&count=3" `
+            -Method Get `
+            -TimeoutSec 60
         $BrokerResults = @($BrokerSearch.results).Count
-        Write-Host "Broker search structure works; provider=$($BrokerSearch.provider), results=$BrokerResults"
+        Write-Host "API-first gateway works; provider=$($BrokerSearch.provider), fallback=$($BrokerSearch.fallback_used), results=$BrokerResults"
+        if ($BrokerResults -le 0) { $AllOk = $false }
     } catch {
         Write-Host "Broker check failed:" $_
         $AllOk = $false

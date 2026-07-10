@@ -33,6 +33,10 @@ class TestPublicConfiguration(unittest.TestCase):
         for name in KEY_NAMES:
             self.assertIn(name, values)
             self.assertEqual(values[name], "")
+        self.assertIn(
+            "# SEARXNG_FREE_ENGINES=bing,sogou,qwant,mojeek",
+            text,
+        )
 
     def test_env_file_and_priority_override(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -64,19 +68,41 @@ class TestPublicPackageSafety(unittest.TestCase):
     def test_no_private_local_paths_in_package(self):
         forbidden = ("E:" + "\\openclaw").lower()
         private_env = (".config" + "\\openclaw.env").lower()
+        runtime_roots = {
+            ".venv",
+            ".pytest_cache",
+            "backups",
+            "runtime",
+            "searxng",
+        }
+        private_files = {
+            "api_pool/tests/live_smoke_test.py",
+            "config/api-pool.env",
+            "config/settings.yml",
+        }
         findings = []
         for path in REPO_ROOT.rglob("*"):
-            if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
+            relative = path.relative_to(REPO_ROOT)
+            relative_text = relative.as_posix()
+            if not relative.parts:
                 continue
-            if path.suffix.lower() in {".pyc", ".sqlite", ".zip"}:
+            if relative.parts[0] in runtime_roots:
+                continue
+            if ".git" in relative.parts or "__pycache__" in relative.parts:
+                continue
+            if relative_text in private_files or relative.parts[:2] == ("api_pool", "data"):
+                continue
+            if path.suffix.lower() in {".log", ".pid", ".pyc", ".sqlite", ".zip"}:
                 continue
             try:
+                if not path.is_file():
+                    continue
                 text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 continue
             lowered = text.lower()
             if forbidden in lowered or private_env in lowered:
-                findings.append(str(path.relative_to(REPO_ROOT)))
+                findings.append(relative_text)
         self.assertEqual(findings, [])
 
     def test_engine_patch_license_and_template_entry(self):
@@ -86,6 +112,14 @@ class TestPublicPackageSafety(unittest.TestCase):
         self.assertIn("engine: api_pool", settings)
         self.assertIn("disabled: true", settings)
         self.assertIn("enable_http: true", settings)
+        self.assertIn('bind_address: "127.0.0.1"', settings)
+        self.assertIn("port: 8888", settings)
+        self.assertIn('method: "GET"', settings)
+
+        deployment = (REPO_ROOT / "skill" / "references" / "deployment.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('method: "GET"', deployment)
 
 
     def test_lifecycle_scripts_treat_api_pool_as_opt_in(self):

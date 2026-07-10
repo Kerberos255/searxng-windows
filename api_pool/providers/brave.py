@@ -4,6 +4,7 @@ Uses the existing Brave Web Search API at:
 https://api.search.brave.com/res/v1/web/search
 """
 
+from datetime import date
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -20,6 +21,8 @@ def search(
     query: str,
     pageno: int = 1,
     time_range: Optional[str] = None,
+    date_after: Optional[str] = None,
+    date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
 ) -> ProviderResult:
@@ -44,10 +47,10 @@ def search(
         )
 
     time_range_map = {
-        "day": "past_day",
-        "week": "past_week",
-        "month": "past_month",
-        "year": "past_year",
+        "day": "pd",
+        "week": "pw",
+        "month": "pm",
+        "year": "py",
     }
 
     params = {
@@ -55,8 +58,12 @@ def search(
         "count": max_results,
         "offset": (pageno - 1) * max_results,
     }
-    if time_range and time_range in time_range_map:
-        params["time_range"] = time_range_map[time_range]
+    if date_after or date_before:
+        start_date = date_after or "1970-01-01"
+        end_date = date_before or date.today().isoformat()
+        params["freshness"] = f"{start_date}to{end_date}"
+    elif time_range and time_range in time_range_map:
+        params["freshness"] = time_range_map[time_range]
     if safesearch:
         # 1=moderate, 2=strict; Brave only supports strict
         params["safesearch"] = "strict" if safesearch >= 2 else "moderate"

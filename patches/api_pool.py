@@ -40,7 +40,7 @@ def request(query: str, params) -> None:
         "query": query,
         "pageno": params.get("pageno", 1),
         "max_results": max_results,
-        "fallback_on_empty": False,
+        "fallback_on_empty": True,
     }
 
     if params.get("time_range"):

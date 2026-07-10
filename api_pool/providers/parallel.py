@@ -35,6 +35,8 @@ def search(
     query: str,
     pageno: int = 1,
     time_range: Optional[str] = None,
+    date_after: Optional[str] = None,
+    date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
 ) -> ProviderResult:
@@ -43,7 +45,9 @@ def search(
     Args:
         query: Search query string.
         pageno: Unused (Parallel handles pagination differently).
-        time_range: Unused.
+        time_range: Relative freshness range.
+        date_after: Exact source-policy start date in YYYY-MM-DD format.
+        date_before: Exact upper bound, enforced from returned publish dates.
         safesearch: Unused.
         max_results: Number of results requested.
 
@@ -72,11 +76,17 @@ def search(
     }.get(time_range, "")
     if freshness:
         objective = (objective[: 5000 - len(freshness)] + freshness).strip()
+    if date_after:
+        freshness = f" Only use sources published on or after {date_after}."
+        objective = (objective[: 5000 - len(freshness)] + freshness).strip()
+    if date_before:
+        freshness = f" Only use sources published on or before {date_before}."
+        objective = (objective[: 5000 - len(freshness)] + freshness).strip()
 
     advanced_settings = {
         "max_results": min(max(max_results, 1), 20),
     }
-    after_date = _after_date_for_time_range(time_range)
+    after_date = date_after or _after_date_for_time_range(time_range)
     if after_date:
         advanced_settings["source_policy"] = {"after_date": after_date}
 
@@ -111,12 +121,22 @@ def search(
                 else:
                     content = str(excerpts) if excerpts else ""
 
+                published_date = item.get("publish_date") or item.get("published_date")
+                if date_before:
+                    if not isinstance(published_date, str):
+                        continue
+                    try:
+                        if date.fromisoformat(published_date[:10]) > date.fromisoformat(date_before):
+                            continue
+                    except ValueError:
+                        continue
+
                 results.append(
                     make_result_item(
                         url=item.get("url", ""),
                         title=item.get("title", ""),
                         content=content or item.get("snippet", ""),
-                        published_date=item.get("publish_date") or item.get("published_date"),
+                        published_date=published_date,
                         score=item.get("score"),
                     )
                 )

@@ -13,7 +13,16 @@ import httpx
 DEFAULT_URL = "http://127.0.0.1:8888"
 
 
-def search(query, limit=10, category="general", language="", time_range=None, timeout=80):
+def search(
+    query,
+    limit=10,
+    category="general",
+    language="",
+    time_range=None,
+    date_after=None,
+    date_before=None,
+    timeout=80,
+):
     base_url = os.environ.get("SEARXNG_URL", DEFAULT_URL).rstrip("/") + "/"
     params = {
         "q": query,
@@ -24,6 +33,10 @@ def search(query, limit=10, category="general", language="", time_range=None, ti
         params["language"] = language
     if time_range:
         params["time_range"] = time_range
+    if date_after:
+        params["date_after"] = date_after
+    if date_before:
+        params["date_before"] = date_before
 
     response = httpx.get(
         urljoin(base_url, "search"),
@@ -69,6 +82,8 @@ def main():
     search_parser.add_argument("-c", "--category", default="general")
     search_parser.add_argument("-l", "--language", default="")
     search_parser.add_argument("-t", "--time-range", choices=["day", "week", "month", "year"])
+    search_parser.add_argument("--date-after", help="Inclusive YYYY-MM-DD start date")
+    search_parser.add_argument("--date-before", help="Inclusive YYYY-MM-DD end date")
     search_parser.add_argument("--timeout", type=float, default=80)
     search_parser.add_argument("-f", "--format", choices=["table", "json"], default="table")
     args = parser.parse_args()
@@ -84,6 +99,8 @@ def main():
             category=args.category,
             language=args.language,
             time_range=args.time_range,
+            date_after=args.date_after,
+            date_before=args.date_before,
             timeout=args.timeout,
         )
     except Exception as exc:

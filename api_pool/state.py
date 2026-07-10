@@ -19,6 +19,7 @@ STATUS_MISCONFIGURED = "misconfigured"
 STATUS_UNAVAILABLE = "unavailable"  # no key configured
 
 _local = threading.local()
+_write_lock = threading.RLock()
 
 
 def close_all():
@@ -35,8 +36,9 @@ def _get_connection() -> sqlite3.Connection:
     """Get thread-local SQLite connection with WAL mode."""
     if not hasattr(_local, "conn") or _local.conn is None:
         config.DB_DIR.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(config.DB_PATH), timeout=10)
+        conn = sqlite3.connect(str(config.DB_PATH), timeout=30)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         _local.conn = conn
@@ -45,24 +47,25 @@ def _get_connection() -> sqlite3.Connection:
 
 def init_db():
     """Create tables if they do not exist."""
-    conn = _get_connection()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS providers (
-            provider       TEXT PRIMARY KEY,
-            status         TEXT NOT NULL DEFAULT 'unavailable',
-            configured     INTEGER NOT NULL DEFAULT 0,
-            cooldown_until REAL,
-            probe_after    REAL,
-            consecutive_failures INTEGER NOT NULL DEFAULT 0,
-            last_http_status      INTEGER,
-            last_error_category   TEXT,
-            last_success_at       REAL,
-            last_attempt_at       REAL,
-            request_count         INTEGER NOT NULL DEFAULT 0,
-            success_count         INTEGER NOT NULL DEFAULT 0
-        );
-    """)
-    conn.commit()
+    with _write_lock:
+        conn = _get_connection()
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS providers (
+                provider       TEXT PRIMARY KEY,
+                status         TEXT NOT NULL DEFAULT 'unavailable',
+                configured     INTEGER NOT NULL DEFAULT 0,
+                cooldown_until REAL,
+                probe_after    REAL,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                last_http_status      INTEGER,
+                last_error_category   TEXT,
+                last_success_at       REAL,
+                last_attempt_at       REAL,
+                request_count         INTEGER NOT NULL DEFAULT 0,
+                success_count         INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        conn.commit()
 
 
 def _ensure_provider(conn: sqlite3.Connection, provider: str):
@@ -76,10 +79,16 @@ def _ensure_provider(conn: sqlite3.Connection, provider: str):
 def get_provider_state(provider: str) -> Optional[dict]:
     """Get full state dict for a provider, or None if not found."""
     conn = _get_connection()
-    _ensure_provider(conn, provider)
     row = conn.execute(
         "SELECT * FROM providers WHERE provider = ?", (provider,)
     ).fetchone()
+    if row is None:
+        with _write_lock:
+            _ensure_provider(conn, provider)
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM providers WHERE provider = ?", (provider,)
+            ).fetchone()
     if row is None:
         return None
     return dict(row)
@@ -99,13 +108,14 @@ def set_configured(provider: str, configured: bool):
     unavailable is handled by ``recover_configured_providers()`` which is
     called on startup only.
     """
-    conn = _get_connection()
-    _ensure_provider(conn, provider)
-    conn.execute(
-        "UPDATE providers SET configured = ? WHERE provider = ?",
-        (1 if configured else 0, provider),
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_connection()
+        _ensure_provider(conn, provider)
+        conn.execute(
+            "UPDATE providers SET configured = ? WHERE provider = ?",
+            (1 if configured else 0, provider),
+        )
+        conn.commit()
 
 
 def recover_configured_providers():
@@ -116,37 +126,39 @@ def recover_configured_providers():
     a failure state from a previous run. Does NOT touch quota_exhausted
     or cooldown (those must expire naturally or via probe).
     """
-    conn = _get_connection()
-    conn.execute(
-        """UPDATE providers
-            SET status = 'available', cooldown_until = NULL, consecutive_failures = 0
-            WHERE configured = 1
-              AND status IN ('unavailable', 'misconfigured')""",
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_connection()
+        conn.execute(
+            """UPDATE providers
+                SET status = 'available', cooldown_until = NULL, consecutive_failures = 0
+                WHERE configured = 1
+                  AND status IN ('unavailable', 'misconfigured')""",
+        )
+        conn.commit()
 
 
 def record_success(provider: str):
     """Record a successful API call."""
     now = datetime.now(timezone.utc).timestamp()
-    conn = _get_connection()
-    _ensure_provider(conn, provider)
-    conn.execute(
-        """UPDATE providers SET
-            status = 'available',
-            cooldown_until = NULL,
-            probe_after = NULL,
-            consecutive_failures = 0,
-            last_http_status = NULL,
-            last_error_category = NULL,
-            last_success_at = ?,
-            last_attempt_at = ?,
-            request_count = request_count + 1,
-            success_count = success_count + 1
-        WHERE provider = ?""",
-        (now, now, provider),
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_connection()
+        _ensure_provider(conn, provider)
+        conn.execute(
+            """UPDATE providers SET
+                status = 'available',
+                cooldown_until = NULL,
+                probe_after = NULL,
+                consecutive_failures = 0,
+                last_http_status = NULL,
+                last_error_category = NULL,
+                last_success_at = ?,
+                last_attempt_at = ?,
+                request_count = request_count + 1,
+                success_count = success_count + 1
+            WHERE provider = ?""",
+            (now, now, provider),
+        )
+        conn.commit()
 
 
 def record_failure(
@@ -168,58 +180,59 @@ def record_failure(
         retry_after: Retry-After header value in seconds, if available.
     """
     now = datetime.now(timezone.utc).timestamp()
-    conn = _get_connection()
-    _ensure_provider(conn, provider)
+    with _write_lock:
+        conn = _get_connection()
+        _ensure_provider(conn, provider)
 
-    if is_misconfigured:
-        status = STATUS_MISCONFIGURED
-        cooldown_until = None
-        probe_after = None
-        consecutive = 0
-    elif is_quota:
-        status = STATUS_QUOTA_EXHAUSTED
-        cooldown_until = None
-        # Probe after 24h by default, or use Retry-After if provided
-        if retry_after:
-            probe_delay = min(retry_after, 86400 * 7)  # cap at 7 days
+        if is_misconfigured:
+            status = STATUS_MISCONFIGURED
+            cooldown_until = None
+            probe_after = None
+            consecutive = 0
+        elif is_quota:
+            status = STATUS_QUOTA_EXHAUSTED
+            cooldown_until = None
+            # Probe after 24h by default, or use Retry-After if provided
+            if retry_after:
+                probe_delay = min(retry_after, 86400 * 7)  # cap at 7 days
+            else:
+                probe_delay = config.QUOTA_PROBE_INTERVAL_SECONDS
+            probe_after = now + probe_delay
+            consecutive = 0
         else:
-            probe_delay = config.QUOTA_PROBE_INTERVAL_SECONDS
-        probe_after = now + probe_delay
-        consecutive = 0
-    else:
-        # Transient error: cooldown
-        status = STATUS_COOLDOWN
-        consecutive = (
-            conn.execute(
-                "SELECT consecutive_failures FROM providers WHERE provider = ?",
-                (provider,),
-            ).fetchone()[0]
-            + 1
-        )
-        if retry_after and retry_after > 0:
-            cooldown_delay = min(retry_after, 3600)  # cap at 1h
-        else:
-            cooldown_delay = min(
-                config.COOLDOWN_BASE_SECONDS * (2 ** (consecutive - 1)),
-                3600,  # cap at 1h
+            # Transient error: cooldown
+            status = STATUS_COOLDOWN
+            consecutive = (
+                conn.execute(
+                    "SELECT consecutive_failures FROM providers WHERE provider = ?",
+                    (provider,),
+                ).fetchone()[0]
+                + 1
             )
-        cooldown_until = now + cooldown_delay
-        probe_after = None
+            if retry_after and retry_after > 0:
+                cooldown_delay = min(retry_after, 3600)  # cap at 1h
+            else:
+                cooldown_delay = min(
+                    config.COOLDOWN_BASE_SECONDS * (2 ** (consecutive - 1)),
+                    3600,  # cap at 1h
+                )
+            cooldown_until = now + cooldown_delay
+            probe_after = None
 
-    conn.execute(
-        """UPDATE providers SET
-            status = ?,
-            cooldown_until = ?,
-            probe_after = ?,
-            consecutive_failures = ?,
-            last_http_status = ?,
-            last_error_category = ?,
-            last_attempt_at = ?,
-            request_count = request_count + 1
-        WHERE provider = ?""",
-        (status, cooldown_until, probe_after, consecutive, http_status, error_category, now, provider),
-    )
-    conn.commit()
+        conn.execute(
+            """UPDATE providers SET
+                status = ?,
+                cooldown_until = ?,
+                probe_after = ?,
+                consecutive_failures = ?,
+                last_http_status = ?,
+                last_error_category = ?,
+                last_attempt_at = ?,
+                request_count = request_count + 1
+            WHERE provider = ?""",
+            (status, cooldown_until, probe_after, consecutive, http_status, error_category, now, provider),
+        )
+        conn.commit()
 
 
 def get_next_available(priority: list[str]) -> Optional[str]:
@@ -228,39 +241,40 @@ def get_next_available(priority: list[str]) -> Optional[str]:
     Also recovers providers whose probe_after has elapsed (single probe gate).
     Returns provider name or None if none available.
     """
-    conn = _get_connection()
-    now = datetime.now(timezone.utc).timestamp()
+    with _write_lock:
+        conn = _get_connection()
+        now = datetime.now(timezone.utc).timestamp()
 
-    for prov in priority:
-        _ensure_provider(conn, prov)
-        row = conn.execute(
-            "SELECT status, cooldown_until, probe_after FROM providers WHERE provider = ?",
-            (prov,),
-        ).fetchone()
-        if row is None:
-            continue
-
-        status = row["status"]
-        cooldown_until = row["cooldown_until"]
-        probe_after = row["probe_after"]
-
-        if status == STATUS_AVAILABLE:
-            return prov
-
-        # If in cooldown but cooldown has expired, auto-recover to available
-        if status == STATUS_COOLDOWN and cooldown_until and now >= cooldown_until:
-            conn.execute(
-                "UPDATE providers SET status = 'available', cooldown_until = NULL WHERE provider = ?",
+        for prov in priority:
+            _ensure_provider(conn, prov)
+            row = conn.execute(
+                "SELECT status, cooldown_until, probe_after FROM providers WHERE provider = ?",
                 (prov,),
-            )
-            conn.commit()
-            return prov
+            ).fetchone()
+            if row is None:
+                continue
 
-        # If quota exhausted but probe time has arrived, allow probe (status stays
-        # quota_exhausted but we return it so the caller can attempt a single probe)
-        if status == STATUS_QUOTA_EXHAUSTED and probe_after and now >= probe_after:
-            # Return it for probing - the caller must call record_success/record_failure
-            return prov
+            status = row["status"]
+            cooldown_until = row["cooldown_until"]
+            probe_after = row["probe_after"]
+
+            if status == STATUS_AVAILABLE:
+                conn.commit()
+                return prov
+
+            if status == STATUS_COOLDOWN and cooldown_until and now >= cooldown_until:
+                conn.execute(
+                    "UPDATE providers SET status = 'available', cooldown_until = NULL WHERE provider = ?",
+                    (prov,),
+                )
+                conn.commit()
+                return prov
+
+            if status == STATUS_QUOTA_EXHAUSTED and probe_after and now >= probe_after:
+                conn.commit()
+                return prov
+
+        conn.commit()
 
     return None
 
@@ -291,7 +305,7 @@ def try_acquire_probe_lease(provider: str) -> bool:
     Only one concurrent caller will succeed. The winner's caller should
     proceed with the API probe; other callers will skip the provider.
     """
-    with _probe_lease_lock:
+    with _probe_lease_lock, _write_lock:
         conn = _get_connection()
         now = datetime.now(timezone.utc).timestamp()
         new_probe = now + config.QUOTA_PROBE_INTERVAL_SECONDS
