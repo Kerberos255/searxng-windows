@@ -1,33 +1,59 @@
 param(
-    [string]$Url = "http://127.0.0.1:8888/search?q=openai&format=json&categories=general"
+    [string]$BrokerUrl = "http://127.0.0.1:8890",
+    [string]$SearxngUrl = "http://127.0.0.1:8888"
 )
 
 $ErrorActionPreference = "Stop"
+$AllOk = $true
 
 try {
-    $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 30
-    Write-Host "HTTP status:" $r.StatusCode
+    $Health = Invoke-RestMethod -Uri "$BrokerUrl/health" -Method Get -TimeoutSec 5
+    Write-Host "Broker health:" $Health.status "providers:" $Health.providers_tracked
+    if ($Health.status -ne "ok") { $AllOk = $false }
 
-    $data = $r.Content | ConvertFrom-Json
-    $resultCount = if ($null -eq $data.results) { 0 } else { @($data.results).Count }
-
-    Write-Host "Query:" $data.query
-    Write-Host "Results:" $resultCount
-
-    if ($data.unresponsive_engines) {
-        Write-Host "Unresponsive engines:"
-        $data.unresponsive_engines | ForEach-Object { Write-Host " -" $_ }
+    $Status = Invoke-RestMethod -Uri "$BrokerUrl/status" -Method Get -TimeoutSec 5
+    Write-Host "API priority:" ($Status.priority_order -join " -> ")
+    foreach ($Provider in $Status.providers) {
+        Write-Host " - $($Provider.provider): configured=$($Provider.configured), status=$($Provider.status)"
     }
 
-    if ($resultCount -gt 0) {
-        Write-Host "SearXNG JSON search works."
-        exit 0
-    } else {
-        Write-Host "SearXNG responded, but no results were returned."
-        exit 2
+    $BrokerBody = @{
+        query = "open source metasearch"
+        max_results = 3
+    } | ConvertTo-Json
+    $BrokerSearch = Invoke-RestMethod `
+        -Uri "$BrokerUrl/search" `
+        -Method Post `
+        -ContentType "application/json" `
+        -Body $BrokerBody `
+        -TimeoutSec 30
+    $BrokerResults = @($BrokerSearch.results).Count
+    Write-Host "Broker search structure works; provider=$($BrokerSearch.provider), results=$BrokerResults"
+} catch {
+    Write-Host "Broker check failed:" $_
+    $AllOk = $false
+}
+
+try {
+    $Encoded = [uri]::EscapeDataString("open source metasearch")
+    $Response = Invoke-RestMethod `
+        -Uri "$SearxngUrl/search?q=$Encoded&format=json&categories=general" `
+        -Method Get `
+        -TimeoutSec 30
+    $ResultCount = @($Response.results).Count
+    Write-Host "SearXNG results:" $ResultCount
+    if ($ResultCount -le 0) {
+        Write-Host "SearXNG responded but returned no free-web results."
+        $AllOk = $false
     }
 } catch {
-    Write-Host "Check failed:"
-    Write-Host $_
-    exit 1
+    Write-Host "SearXNG check failed:" $_
+    $AllOk = $false
 }
+
+if ($AllOk) {
+    Write-Host "All checks passed."
+    exit 0
+}
+Write-Host "Some checks failed."
+exit 1

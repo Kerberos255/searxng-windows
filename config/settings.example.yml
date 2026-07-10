@@ -37,6 +37,16 @@ ui:
   infinite_scroll: false
 
 engines:
+  # Optional API-backed search pool. With no keys configured it returns no API
+  # results, while normal SearXNG free-web engines continue to work.
+  - name: api pool
+    engine: api_pool
+    disabled: false
+    enable_http: true
+    categories:
+      - general
+      - web
+
   - name: duckduckgo
     disabled: true
   - name: duckduckgo images

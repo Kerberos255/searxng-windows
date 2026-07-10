@@ -12,6 +12,7 @@ This repository packages the practical Windows setup:
 - start, stop, update, check, and logon startup scripts
 - OpenClaw skill and config notes
 - Windows compatibility patch for SearXNG's Unix-only `pwd` import path
+- optional serial API Pool with Brave, Firecrawl, Tavily, and Parallel
 
 ## What This Repo Does Not Include
 
@@ -22,6 +23,7 @@ This repo intentionally does not include:
 - logs, PID files, or downloaded source zips
 - real `settings.yml` secrets
 - private OpenClaw config files
+- real API Pool keys, local SQLite state, or `config/api-pool.env`
 
 ## Quick Start for Normal Users
 
@@ -127,6 +129,40 @@ The `run.ps1` script can also set standard proxy environment variables. Proxy is
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1" -ProxyUrl "http://127.0.0.1:10808"
 ```
 
+## Optional API Pool
+
+The installer also deploys a local API Pool Broker at `http://127.0.0.1:8890`.
+SearXNG sees it as one `api pool` engine, while the Broker tries providers in this
+order by default:
+
+```text
+Brave -> Firecrawl -> Tavily -> Parallel
+```
+
+Only the first successful provider is used. Quota exhaustion, rate limits, and
+transient failures automatically fall through to the next configured provider.
+With no API keys configured, the Broker returns an empty API result and ordinary
+SearXNG free-web engines continue normally.
+
+Edit the installed file:
+
+```text
+%USERPROFILE%\Apps\searxng-windows\config\api-pool.env
+```
+
+Available variables:
+
+```dotenv
+BRAVE_API_KEY=
+FIRECRAWL_API_KEY=
+TAVILY_API_KEY=
+PARALLEL_API_KEY=
+API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+```
+
+The real env file and local SQLite state are excluded from Git. See
+[`api_pool/README.md`](api_pool/README.md) for status behavior and testing details.
+
 ## Engine Notes
 
 SearXNG queries engines concurrently. One failing engine should not block other engines from returning results; failures appear in `unresponsive_engines`.
@@ -145,12 +181,12 @@ The task name is `OpenClaw SearXNG`.
 
 ## CI
 
-GitHub Actions validates PowerShell script syntax and Python helper syntax on push and pull requests.
+GitHub Actions validates PowerShell syntax, compiles all Python sources, and runs the mocked API Pool test suite on push and pull requests.
 
 ## License Notes
 
 This repository's deployment scripts and documentation are MIT licensed.
 
-SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. The Windows compatibility patch is applied locally to the downloaded SearXNG source tree during installation/update. This repository does not redistribute the patched SearXNG source.
+SearXNG itself is not included in this repository. The install scripts download SearXNG from the upstream project, which is licensed under AGPL-3.0-or-later. The Windows compatibility patch and the small `patches/api_pool.py` SearXNG engine adapter are applied locally to the downloaded SearXNG source tree during installation/update. The adapter is marked AGPL-3.0-or-later; the standalone Broker and deployment scripts remain MIT licensed. This repository does not redistribute a complete patched SearXNG source tree.
 
 Any distribution that bundles SearXNG source code or modified SearXNG files must comply with SearXNG's upstream license.

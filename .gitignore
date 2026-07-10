@@ -5,6 +5,10 @@ _extract/
 *.log
 *.pid
 config/settings.yml
+config/api-pool.env
+api_pool/data/
+*.sqlite
+*.sqlite-*
 *.bak*
 __pycache__/
 *.pyc
