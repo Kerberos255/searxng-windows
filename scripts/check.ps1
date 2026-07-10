@@ -1,4 +1,5 @@
 param(
+    [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
     [string]$BrokerUrl = "http://127.0.0.1:8890",
     [string]$SearxngUrl = "http://127.0.0.1:8888"
 )
@@ -6,32 +7,44 @@ param(
 $ErrorActionPreference = "Stop"
 $AllOk = $true
 
-try {
-    $Health = Invoke-RestMethod -Uri "$BrokerUrl/health" -Method Get -TimeoutSec 5
-    Write-Host "Broker health:" $Health.status "providers:" $Health.providers_tracked
-    if ($Health.status -ne "ok") { $AllOk = $false }
+$ApiPoolHelper = Join-Path $Root "scripts\api-pool.ps1"
+if (!(Test-Path $ApiPoolHelper)) {
+    Write-Host "API Pool helper not found: $ApiPoolHelper"
+    exit 1
+}
+. $ApiPoolHelper
+$ApiPoolEnabled = Test-ApiPoolEnabled -Root $Root
 
-    $Status = Invoke-RestMethod -Uri "$BrokerUrl/status" -Method Get -TimeoutSec 5
-    Write-Host "API priority:" ($Status.priority_order -join " -> ")
-    foreach ($Provider in $Status.providers) {
-        Write-Host " - $($Provider.provider): configured=$($Provider.configured), status=$($Provider.status)"
+if ($ApiPoolEnabled) {
+    try {
+        $Health = Invoke-RestMethod -Uri "$BrokerUrl/health" -Method Get -TimeoutSec 5
+        Write-Host "Broker health:" $Health.status "providers:" $Health.providers_tracked
+        if ($Health.status -ne "ok") { $AllOk = $false }
+
+        $Status = Invoke-RestMethod -Uri "$BrokerUrl/status" -Method Get -TimeoutSec 5
+        Write-Host "API priority:" ($Status.priority_order -join " -> ")
+        foreach ($Provider in $Status.providers) {
+            Write-Host " - $($Provider.provider): configured=$($Provider.configured), status=$($Provider.status)"
+        }
+
+        $BrokerBody = @{
+            query = "open source metasearch"
+            max_results = 3
+        } | ConvertTo-Json
+        $BrokerSearch = Invoke-RestMethod `
+            -Uri "$BrokerUrl/search" `
+            -Method Post `
+            -ContentType "application/json" `
+            -Body $BrokerBody `
+            -TimeoutSec 30
+        $BrokerResults = @($BrokerSearch.results).Count
+        Write-Host "Broker search structure works; provider=$($BrokerSearch.provider), results=$BrokerResults"
+    } catch {
+        Write-Host "Broker check failed:" $_
+        $AllOk = $false
     }
-
-    $BrokerBody = @{
-        query = "open source metasearch"
-        max_results = 3
-    } | ConvertTo-Json
-    $BrokerSearch = Invoke-RestMethod `
-        -Uri "$BrokerUrl/search" `
-        -Method Post `
-        -ContentType "application/json" `
-        -Body $BrokerBody `
-        -TimeoutSec 30
-    $BrokerResults = @($BrokerSearch.results).Count
-    Write-Host "Broker search structure works; provider=$($BrokerSearch.provider), results=$BrokerResults"
-} catch {
-    Write-Host "Broker check failed:" $_
-    $AllOk = $false
+} else {
+    Write-Host "API Pool is disabled; Broker checks skipped."
 }
 
 try {

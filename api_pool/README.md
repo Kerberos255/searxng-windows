@@ -10,6 +10,10 @@ Default order:
 Brave -> Firecrawl -> Tavily -> Parallel
 ```
 
+The public Windows template keeps this engine disabled by default. Set the
+`api pool` entry in `config/settings.yml` to `disabled: false` before starting
+the Broker through the normal `start.ps1` workflow.
+
 ## Configuration
 
 Copy `config/api-pool.env.example` to `config/api-pool.env` and fill only the

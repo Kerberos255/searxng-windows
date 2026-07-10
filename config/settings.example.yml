@@ -37,11 +37,11 @@ ui:
   infinite_scroll: false
 
 engines:
-  # Optional API-backed search pool. With no keys configured it returns no API
-  # results, while normal SearXNG free-web engines continue to work.
+  # Optional API-backed search pool. It is disabled by default.
+  # Set disabled: false and add keys to config/api-pool.env to enable it.
   - name: api pool
     engine: api_pool
-    disabled: false
+    disabled: true
     enable_http: true
     categories:
       - general

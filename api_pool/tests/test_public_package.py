@@ -84,7 +84,19 @@ class TestPublicPackageSafety(unittest.TestCase):
         settings = (REPO_ROOT / "config" / "settings.example.yml").read_text(encoding="utf-8")
         self.assertIn("SPDX-License-Identifier: AGPL-3.0-or-later", engine)
         self.assertIn("engine: api_pool", settings)
+        self.assertIn("disabled: true", settings)
         self.assertIn("enable_http: true", settings)
+
+
+    def test_lifecycle_scripts_treat_api_pool_as_opt_in(self):
+        start = (REPO_ROOT / "scripts" / "start.ps1").read_text(encoding="utf-8")
+        check = (REPO_ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
+        helper = (REPO_ROOT / "scripts" / "api-pool.ps1").read_text(encoding="utf-8")
+        self.assertIn("Test-ApiPoolEnabled", helper)
+        self.assertIn("if ($ApiPoolEnabled)", start)
+        self.assertIn("Broker startup skipped", start)
+        self.assertIn("if ($ApiPoolEnabled)", check)
+        self.assertIn("Broker checks skipped", check)
 
 
 if __name__ == "__main__":
