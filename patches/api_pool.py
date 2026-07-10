@@ -5,6 +5,7 @@ The Broker (api_pool/app.py) manages Brave / Firecrawl / Tavily / Parallel API c
 with automatic failover and quota tracking.
 """
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from searx.result_types import EngineResults
@@ -55,14 +56,28 @@ def request(query: str, params) -> None:
     params["timeout"] = timeout
 
 
+def _parse_published_date(value):
+    """Convert Broker ISO date strings to the datetime SearXNG expects."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 def response(resp) -> EngineResults:
     """Process Broker JSON response and return results."""
     res = EngineResults()
     data = resp.json()
 
     results = data.get("results", [])
-    attempts = data.get("attempts", [])
-    used_provider = data.get("provider")
 
     for item in results:
         res.add(
@@ -70,7 +85,7 @@ def response(resp) -> EngineResults:
                 url=item.get("url", ""),
                 title=item.get("title", ""),
                 content=item.get("content", ""),
-                publishedDate=item.get("published_date"),
+                publishedDate=_parse_published_date(item.get("published_date")),
                 score=item.get("score"),
             ),
         )
