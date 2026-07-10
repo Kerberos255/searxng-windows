@@ -29,4 +29,16 @@ jobs:
       - name: Check Python syntax
         shell: pwsh
         run: |
-          python -m py_compile skill/scripts/search.py skill/scripts/searxng.py
+          $pythonFiles = @(
+            "skill/scripts/search.py"
+            "skill/scripts/searxng.py"
+            "patches/api_pool.py"
+          )
+          $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
+          python -m py_compile @pythonFiles
+
+      - name: Run API Pool tests
+        shell: pwsh
+        run: |
+          python -m pip install -r api_pool/requirements.txt
+          python -m unittest discover -s api_pool/tests -v

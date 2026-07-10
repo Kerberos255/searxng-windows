@@ -12,6 +12,7 @@
 - 提供 start、stop、update、check 和登录自启动脚本
 - 包含 OpenClaw skill 和配置说明
 - 包含 SearXNG 在 Windows 上遇到 Unix-only `pwd` 导入问题时的兼容补丁
+- 可选的串行 API Pool，支持 Brave、Firecrawl、Tavily 和 Parallel
 
 ## 仓库不包含什么
 
@@ -22,6 +23,7 @@
 - 日志、PID 文件、下载的源码 zip
 - 真实 `settings.yml` 里的密钥
 - 私有 OpenClaw 配置
+- API Pool 真实密钥、本地 SQLite 状态或 `config/api-pool.env`
 
 ## 普通用户快速开始
 
@@ -129,6 +131,43 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 
 请把 `127.0.0.1:10808` 改成你的本地代理地址。
 
+## 可选 API Pool
+
+安装器会同时部署一个仅监听本机的 API Pool Broker：
+
+```text
+http://127.0.0.1:8890
+```
+
+SearXNG 只看到一个 `api pool` 引擎，Broker 默认按以下顺序串行尝试：
+
+```text
+Brave → Firecrawl → Tavily → Parallel
+```
+
+每次只使用第一家成功的 API。额度耗尽、临时限流、超时或服务故障时，
+自动切换到下一家已配置的 provider。没有配置任何 Key 时，API Pool 返回
+空结果，普通 SearXNG 免费网页引擎仍会照常工作。
+
+编辑安装目录中的：
+
+```text
+%USERPROFILE%\Apps\searxng-windows\config\api-pool.env
+```
+
+可用变量：
+
+```dotenv
+BRAVE_API_KEY=
+FIRECRAWL_API_KEY=
+TAVILY_API_KEY=
+PARALLEL_API_KEY=
+API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+```
+
+真实 env 文件和 SQLite 状态都被 Git 忽略。详细状态机、接口和测试说明见
+[`api_pool/README.md`](api_pool/README.md)。
+
 ## 搜索引擎说明
 
 SearXNG 会并发请求多个搜索引擎。某一个引擎验证码、限流或超时，通常不会阻止其他引擎返回结果；失败的引擎会出现在 `unresponsive_engines`。
@@ -147,7 +186,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Ro
 
 ## CI
 
-GitHub Actions 会在 push 和 pull request 时检查 PowerShell 脚本语法和 Python 辅助脚本语法。
+GitHub Actions 会在 push 和 pull request 时检查 PowerShell 语法、编译全部 Python 文件，并运行使用 Mock 上游的 API Pool 测试。
 
 ## 常用命令
 
@@ -166,6 +205,6 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 
 本仓库的部署脚本和文档使用 MIT 许可证。
 
-本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。Windows 兼容补丁会在安装/更新时应用到用户本机下载的 SearXNG 源码目录中；本仓库本身不重新分发已打补丁的 SearXNG 源码。
+本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。Windows 兼容补丁和小型 `patches/api_pool.py` SearXNG 引擎适配器会在安装/更新时应用到用户本机下载的源码目录中。适配器标注为 AGPL-3.0-or-later；独立 Broker 与部署脚本仍使用 MIT 许可证。本仓库不重新分发完整的已修改 SearXNG 源码树。
 
 如果分发包含 SearXNG 源码或修改过的 SearXNG 文件的整包，需要遵守 SearXNG 的上游许可证。

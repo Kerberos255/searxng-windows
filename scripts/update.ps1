@@ -60,6 +60,10 @@ if (Test-Path (Join-Path $Repo ".git")) {
 Set-Location $Repo
 & $Python -m pip install -U pip setuptools wheel
 & $Python -m pip install -r requirements.txt
+$ApiPoolRequirements = Join-Path $Root "api_pool\requirements.txt"
+if (Test-Path $ApiPoolRequirements) {
+    & $Python -m pip install -r $ApiPoolRequirements
+}
 & $Python -m pip install -e .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Editable install failed with build isolation; retrying without build isolation."

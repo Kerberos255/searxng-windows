@@ -23,10 +23,28 @@ if (!$PythonCommand) {
 $RuntimePythonResolved = $PythonCommand.Source
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $Root "scripts"),(Join-Path $Root "config") | Out-Null
+New-Item -ItemType Directory -Force -Path `
+    (Join-Path $Root "scripts"), `
+    (Join-Path $Root "config"), `
+    (Join-Path $Root "api_pool"), `
+    (Join-Path $Root "patches") | Out-Null
 
 if ((Resolve-Path -LiteralPath $ScriptRoot).Path -ne (Resolve-Path -LiteralPath (Join-Path $Root "scripts")).Path) {
-    Copy-Item -LiteralPath (Join-Path $ScriptRoot "*") -Destination (Join-Path $Root "scripts") -Recurse -Force
+    Copy-Item -Path (Join-Path $ScriptRoot "*") -Destination (Join-Path $Root "scripts") -Recurse -Force
+}
+
+if ((Resolve-Path -LiteralPath $RepoRoot).Path -ne (Resolve-Path -LiteralPath $Root).Path) {
+    Copy-Item -Path (Join-Path $RepoRoot "api_pool\*") -Destination (Join-Path $Root "api_pool") -Recurse -Force
+    Copy-Item -Path (Join-Path $RepoRoot "patches\*") -Destination (Join-Path $Root "patches") -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "config\settings.example.yml") -Destination (Join-Path $Root "config\settings.example.yml") -Force
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "config\api-pool.env.example") -Destination (Join-Path $Root "config\api-pool.env.example") -Force
+}
+
+$ApiPoolEnv = Join-Path $Root "config\api-pool.env"
+$ApiPoolEnvExample = Join-Path $Root "config\api-pool.env.example"
+if (!(Test-Path $ApiPoolEnv) -and (Test-Path $ApiPoolEnvExample)) {
+    Copy-Item -LiteralPath $ApiPoolEnvExample -Destination $ApiPoolEnv
+    Write-Host "Created config\api-pool.env with empty API key placeholders."
 }
 
 if (!(Test-Path (Join-Path $Root "config\settings.yml")) -and (Test-Path (Join-Path $RepoRoot "config\settings.example.yml"))) {
@@ -64,6 +82,10 @@ if (!(Test-Path $Python)) {
 Set-Location $Repo
 
 & $Python -m pip install -r requirements.txt
+$ApiPoolRequirements = Join-Path $Root "api_pool\requirements.txt"
+if (Test-Path $ApiPoolRequirements) {
+    & $Python -m pip install -r $ApiPoolRequirements
+}
 & $Python -m pip install -e .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Editable install failed with build isolation; retrying without build isolation."

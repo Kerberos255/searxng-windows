@@ -68,3 +68,22 @@ if ($Patched -match 'pwd\.getpwuid\(os\.getuid\(\)\).*_pw\.pw_name, _pw\.pw_uid'
 }
 
 Write-Host "Windows compatibility patch applied."
+
+
+$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $ScriptRoot
+$ApiPoolPatch = Join-Path $RepoRoot "patches\api_pool.py"
+$ApiPoolTarget = Join-Path $Root "searxng\searx\engines\api_pool.py"
+
+if (!(Test-Path $ApiPoolPatch)) {
+    Write-Host "API Pool engine patch not found: $ApiPoolPatch"
+    exit 1
+}
+
+Copy-Item -LiteralPath $ApiPoolPatch -Destination $ApiPoolTarget -Force
+if (!(Test-Path $ApiPoolTarget)) {
+    Write-Host "API Pool engine installation failed: $ApiPoolTarget"
+    exit 1
+}
+
+Write-Host "API Pool SearXNG engine installed."
