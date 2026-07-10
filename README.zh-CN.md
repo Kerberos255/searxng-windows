@@ -2,75 +2,54 @@
 
 [English](README.md) | 简体中文
 
-这是一个面向 Windows 的本地 SearXNG 部署脚本包，用于让 OpenClaw 使用本机 SearXNG 作为网页搜索后端。
+这是一套面向 OpenClaw 的 Windows 原生 SearXNG 安装与维护工具。服务只在本机
+运行，不需要 Docker。
 
-这个仓库整理的是一套实用的 Windows 原生部署方案：
+## 主要功能
 
-- 使用标准 Python + venv，不需要 Docker
-- 本地 SearXNG 地址：`http://127.0.0.1:8888`
-- 可选配置 SearXNG 出站搜索代理
-- 提供 start、stop、update、check 和登录自启动脚本
-- 包含 OpenClaw skill 和配置说明
-- 包含 SearXNG 在 Windows 上遇到 Unix-only `pwd` 导入问题时的兼容补丁
-- 可选的串行 API Pool，支持 Brave、Firecrawl、Tavily 和 Parallel
+- 本地地址：`http://127.0.0.1:8888`
+- 使用标准 Python 和虚拟环境
+- 支持可选的出站代理
+- 提供安装、启动、停止、更新、健康检查和登录自启动脚本
+- 自动应用 SearXNG 所需的 Windows 兼容补丁
+- 可选 API Pool，支持 Brave、Firecrawl、Tavily 和 Parallel
+- API Key、本地状态、日志和生成配置都不会提交到 Git
 
-## 仓库不包含什么
+## 系统要求
 
-这个仓库只保存脚本和模板，不包含：
+- Windows 10 或 Windows 11
+- Python 3.11 或 3.12 x64
+- 安装时可以访问互联网
+- Git 可选；没有 Git 时安装器会改用源码 ZIP
 
-- Python 虚拟环境
-- SearXNG 源码副本
-- 日志、PID 文件、下载的源码 zip
-- 真实 `settings.yml` 里的密钥
-- 私有 OpenClaw 配置
-- API Pool 真实密钥、本地 SQLite 状态或 `config/api-pool.env`
+## 快速安装
 
-## 普通用户快速开始
-
-1. 安装 Python 3.11 或 3.12 x64。
-2. 从最新 Release 下载 `install-searxng-windows.cmd` 和 `install-searxng-windows.ps1`，并放在同一个文件夹里。
-3. 双击 `install-searxng-windows.cmd`。
-4. 启动并检查 SearXNG：
+1. 从最新 GitHub Release 下载下面两个文件，并放在同一目录：
+   - `install-searxng-windows.cmd`
+   - `install-searxng-windows.ps1`
+2. 双击 `install-searxng-windows.cmd`。
+3. 启动 SearXNG 并运行健康检查：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
 ```
 
-打开：
+4. 打开 `http://127.0.0.1:8888`。
+
+默认安装目录：
 
 ```text
-http://127.0.0.1:8888
+%USERPROFILE%\Apps\searxng-windows
 ```
 
-默认部署目录是 `$env:USERPROFILE\Apps\searxng-windows`。
-
-## 从 Git 仓库高级安装
-
-1. 把 `config/settings.example.yml` 复制到部署目录的 `config/settings.yml`。
-2. 把 `CHANGE_ME_GENERATE_WITH_SECRETS_TOKEN_URLSAFE` 替换成随机 secret：
-
-```powershell
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-3. 安装：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
-```
-
-如果系统 PATH 里没有可用的 `python` 命令，可以用 `-RuntimePython` 传入完整 Python 路径。
-
-## Bootstrap 安装器
-
-普通用户可以双击 `install-searxng-windows.cmd`。高级用户可以先查看 `install-searxng-windows.ps1` 的内容，再在 PowerShell 里直接运行。
-
-这个 bootstrap 安装器会下载本仓库的 Release 源码包，然后运行 `scripts\install.ps1`。后者会在安装过程中自动下载上游官方 SearXNG。本仓库不捆绑 SearXNG、Python、venv 或已打补丁的 SearXNG 源码。
+bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG、创建虚拟
+环境、安装依赖、生成本地 `secret_key`，并应用 Windows 补丁。已有的
+`config/settings.yml` 和 `config/api-pool.env` 会被保留。
 
 ## OpenClaw 集成
 
-把 OpenClaw 的网页搜索 provider 设置成 `searxng`：
+把 OpenClaw 的网页搜索后端设置为本机 SearXNG：
 
 ```json
 {
@@ -101,17 +80,49 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERP
 }
 ```
 
-同时建议在 OpenClaw 启动环境里设置：
+同时在 OpenClaw 启动环境中设置：
 
 ```cmd
 set "SEARXNG_URL=http://127.0.0.1:8888"
 ```
 
-修改配置后重启 OpenClaw。
+修改后重启 OpenClaw。
 
-## 代理说明
+## 可选 API Pool
 
-默认不启用代理。如果 SearXNG 直接访问搜索引擎超时，可以在 `settings.yml` 里取消注释代理配置：
+API Pool 会随安装包部署，但**默认关闭**。关闭时不会启动本地 Broker，普通
+SearXNG 搜索引擎照常工作。
+
+启用步骤：
+
+1. 编辑 `%USERPROFILE%\Apps\searxng-windows\config\settings.yml`。
+2. 把 `api pool` 条目的 `disabled: true` 改为 `disabled: false`。
+3. 在 `config\api-pool.env` 中至少填写一个 Key：
+
+```dotenv
+BRAVE_API_KEY=
+FIRECRAWL_API_KEY=
+TAVILY_API_KEY=
+PARALLEL_API_KEY=
+API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+```
+
+4. 重启 SearXNG。
+
+Broker 只监听 `http://127.0.0.1:8890`，并按下面的顺序串行尝试已配置的
+provider：
+
+```text
+Brave → Firecrawl → Tavily → Parallel
+```
+
+第一家成功后立即停止，不会让一次搜索同时消耗所有 API 的额度。接口、状态机
+和故障切换说明见 [`api_pool/README.md`](api_pool/README.md)。
+
+## 代理配置
+
+默认不使用代理。如果出站搜索超时，可以编辑 `config/settings.yml`，启用示例
+代理配置：
 
 ```yaml
 outgoing:
@@ -123,92 +134,88 @@ outgoing:
       - http://127.0.0.1:10808
 ```
 
-然后用 `-ProxyUrl` 启动，让 `run.ps1` 同时设置常见代理环境变量：
+请替换成自己的代理地址。启动时也传入同一个代理，让 API Pool 和相关工具获得
+标准代理环境变量：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1" -ProxyUrl "http://127.0.0.1:10808"
 ```
 
-请把 `127.0.0.1:10808` 改成你的本地代理地址。
-
-## 可选 API Pool
-
-安装器会包含 API Pool 代码，但默认关闭，也不会启动 Broker：
-
-```text
-http://127.0.0.1:8890
-```
-
-SearXNG 只看到一个 `api pool` 引擎，Broker 默认按以下顺序串行尝试：
-
-```text
-Brave → Firecrawl → Tavily → Parallel
-```
-
-需要使用时，请把安装目录 `config/settings.yml` 中 `api pool` 条目的
-`disabled: true` 改成 `disabled: false`，然后在 `config/api-pool.env` 至少
-填写一个 API Key，再重启 SearXNG。
-
-每次只使用第一家成功的 API。额度耗尽、临时限流、超时或服务故障时，
-自动切换到下一家已配置的 provider。保持默认关闭时，Broker 会被完全跳过，
-普通 SearXNG 免费网页引擎仍会照常工作。
-
-编辑安装目录中的：
-
-```text
-%USERPROFILE%\Apps\searxng-windows\config\api-pool.env
-```
-
-可用变量：
-
-```dotenv
-BRAVE_API_KEY=
-FIRECRAWL_API_KEY=
-TAVILY_API_KEY=
-PARALLEL_API_KEY=
-API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
-```
-
-真实 env 文件和 SQLite 状态都被 Git 忽略。详细状态机、接口和测试说明见
-[`api_pool/README.md`](api_pool/README.md)。
-
-## 搜索引擎说明
-
-SearXNG 会并发请求多个搜索引擎。某一个引擎验证码、限流或超时，通常不会阻止其他引擎返回结果；失败的引擎会出现在 `unresponsive_engines`。
-
-这个模板默认禁用了 DuckDuckGo 系列，因为在代理或共享出口下它比较容易触发验证码。SearXNG 里的 Brave 引擎抓取的是 `search.brave.com` 网页结果，不使用 Brave 官方 API key，但也可能被限流。
-
-## 开机启动
-
-注册 Windows 登录自启动：
+## 常用操作
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register-startup-task.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
+$Root = "$env:USERPROFILE\Apps\searxng-windows"
+
+# 启动 SearXNG；API Pool 启用时也会启动 Broker
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\start.ps1"
+
+# 停止本地服务
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\stop.ps1"
+
+# 检查服务状态并执行一次测试搜索
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\check.ps1"
+
+# 更新上游 SearXNG 源码和依赖
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\update.ps1"
+
+# 注册 Windows 登录自启动
+powershell -ExecutionPolicy Bypass -File "$Root\scripts\register-startup-task.ps1" -Root $Root
 ```
 
-计划任务名称是 `OpenClaw SearXNG`。
+`update.ps1` 只更新上游 SearXNG。要更新本仓库的 Windows 脚本、API Pool 和配置
+模板，请重新运行最新 Release 中的安装器；已有本地配置会被保留。
 
-## CI
-
-GitHub Actions 会在 push 和 pull request 时检查 PowerShell 语法、编译全部 Python 文件，并运行使用 Mock 上游的 API Pool 测试。
-
-## 常用命令
+## 从 Git 仓库安装
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\stop.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\update.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
+git clone https://github.com/Kerberos255/searxng-windows.git
+cd searxng-windows
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERPROFILE\Apps\searxng-windows"
 ```
 
-## Skill
+当 `config/settings.yml` 不存在时，安装脚本会自动创建它并生成本地 secret；不需
+手工生成。系统 PATH 中没有 `python` 时，可用 `-RuntimePython` 指定完整路径。
+需要固定某个版本时，bootstrap 安装器支持传入 `-Ref v0.2.0`。
 
-`skill/` 目录里包含一个可放入 OpenClaw/Codex skill 目录的 SearXNG skill，用于记录本地部署、诊断流程和搜索脚本。
+## 故障排查
 
-## 许可证说明
+先运行 `scripts\check.ps1`。安装目录中的常用日志：
 
-本仓库的部署脚本和文档使用 MIT 许可证。
+```text
+searxng-run.log
+searxng-run.err.log
+broker-run.log
+broker-run.err.log
+```
 
-本仓库不包含 SearXNG 本身。安装脚本会从上游 SearXNG 项目下载源码，SearXNG 的上游许可证是 AGPL-3.0-or-later。Windows 兼容补丁和小型 `patches/api_pool.py` SearXNG 引擎适配器会在安装/更新时应用到用户本机下载的源码目录中。适配器标注为 AGPL-3.0-or-later；独立 Broker 与部署脚本仍使用 MIT 许可证。本仓库不重新分发完整的已修改 SearXNG 源码树。
+- `8888` 是 SearXNG 端口；`8890` 是可选 API Pool Broker 端口。
+- 某个搜索引擎失败时，通常不会阻止其他引擎返回结果。
+- 模板默认禁用 DuckDuckGo 系列，因为共享出口或代理环境较容易触发验证码。
+- SearXNG 自带的 Brave 引擎抓取公开网页结果，不使用官方 API Key；API Pool 中
+  的 Brave provider 才使用官方 Key。
 
-如果分发包含 SearXNG 源码或修改过的 SearXNG 文件的整包，需要遵守 SearXNG 的上游许可证。
+## 仓库边界
+
+本仓库不会包含：
+
+- Python 虚拟环境或 SearXNG 源码副本
+- 生成后的 `config/settings.yml` 或真实 API Key
+- `config/api-pool.env`、SQLite 状态、日志、PID 或下载文件
+- 私有 OpenClaw 配置
+
+## CI 与 Release
+
+每次 push 和 pull request 都会运行 Windows CI：检查 PowerShell 语法、编译
+Python、运行 API Pool 测试，并执行公开包防泄漏检查。
+
+推送 `v0.2.0` 这类语义化版本标签后，会触发 Release 工作流。它会重新验证代码、
+确认标签对应的提交属于 `main`、构建 ZIP 和 bootstrap 安装器、生成 SHA-256
+校验文件，然后自动创建 GitHub Release。
+
+## 许可证
+
+部署脚本、独立 API Pool Broker 和文档使用 MIT 许可证。
+
+SearXNG 从上游项目下载，使用 AGPL-3.0-or-later 许可证；小型
+`patches/api_pool.py` 引擎适配器同样标注为 AGPL-3.0-or-later。分发包含
+SearXNG 源码或修改文件的整包时，需要遵守其上游许可证。

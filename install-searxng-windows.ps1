@@ -2,7 +2,7 @@ param(
     [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
     [string]$RuntimePython = "python",
     [string]$Repo = "Kerberos255/searxng-windows",
-    [string]$Ref = "v0.1.0"
+    [string]$Ref = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +12,21 @@ $ZipPath = Join-Path $TempRoot "searxng-windows.zip"
 $ExtractPath = Join-Path $TempRoot "extract"
 
 New-Item -ItemType Directory -Force -Path $TempRoot, $ExtractPath | Out-Null
+
+if (!$Ref) {
+    $LatestReleaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
+    Write-Host "Resolving latest release: $LatestReleaseUrl"
+    $Headers = @{
+        Accept = "application/vnd.github+json"
+        "User-Agent" = "searxng-windows-installer"
+    }
+    $LatestRelease = Invoke-RestMethod -Uri $LatestReleaseUrl -Headers $Headers
+    $Ref = [string]$LatestRelease.tag_name
+    if (!$Ref) {
+        throw "GitHub did not return a latest release tag."
+    }
+    Write-Host "Latest release: $Ref"
+}
 
 try {
     $ArchiveUrl = "https://github.com/$Repo/archive/refs/tags/$Ref.zip"
