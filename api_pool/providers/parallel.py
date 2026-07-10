@@ -42,11 +42,28 @@ def search(
             is_misconfigured=True,
         )
 
+    if pageno > 1:
+        return ProviderResult(success=True, results=[], http_status=200)
+
+    normalized_query = " ".join(query.split())
+    search_query = normalized_query[:200]
+    objective = normalized_query[:5000]
+    freshness = {
+        "day": " Prefer sources published within the past day.",
+        "week": " Prefer sources published within the past week.",
+        "month": " Prefer sources published within the past month.",
+        "year": " Prefer sources published within the past year.",
+    }.get(time_range, "")
+    if freshness:
+        objective = (objective[: 5000 - len(freshness)] + freshness).strip()
+
     payload = {
-        "search_queries": [query],
-        "objective": query,
-        "mode": "turbo",  # Use turbo to avoid high costs of advanced mode
-        "max_results": min(max_results, 20),
+        "search_queries": [search_query],
+        "objective": objective,
+        "mode": "advanced",
+        "advanced_settings": {
+            "max_results": min(max(max_results, 1), 20),
+        },
     }
 
     try:

@@ -637,7 +637,7 @@ class TestParallelHeaders(BrokerTestBase):
 
     @patch("api_pool.providers.parallel.get_http_client")
     def test_parallel_x_api_key_header_and_mode(self, mock_get_client):
-        """Verify Parallel sends x-api-key header and default mode='turbo'."""
+        """Verify Parallel sends x-api-key header and quality-first mode."""
         import httpx
 
         captured_headers = {}
@@ -671,7 +671,9 @@ class TestParallelHeaders(BrokerTestBase):
         self.assertIn("x-api-key", captured_headers)
         self.assertIn("test-key", captured_headers["x-api-key"])
         # Verify mode default
-        self.assertEqual(captured_body.get("mode"), "turbo")
+        self.assertEqual(captured_body.get("mode"), "advanced")
+        self.assertEqual(captured_body.get("advanced_settings"), {"max_results": 10})
+        self.assertNotIn("max_results", captured_body)
 
 
 class TestProbeLeaseConcurrent(BrokerTestBase):

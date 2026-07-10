@@ -7,7 +7,7 @@ multiple free quotas are not consumed by every search.
 Default order:
 
 ```text
-Brave -> Firecrawl -> Tavily -> Parallel
+Parallel -> Tavily -> Brave -> Firecrawl
 ```
 
 The public Windows template keeps this engine disabled by default. Set the
@@ -24,7 +24,7 @@ BRAVE_API_KEY=
 FIRECRAWL_API_KEY=
 TAVILY_API_KEY=
 PARALLEL_API_KEY=
-API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
 The real `config/api-pool.env` is ignored by Git. Process environment variables

@@ -106,7 +106,7 @@ BRAVE_API_KEY=
 FIRECRAWL_API_KEY=
 TAVILY_API_KEY=
 PARALLEL_API_KEY=
-API_POOL_PRIORITY=brave,firecrawl,tavily,parallel
+API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
 4. Restart SearXNG.
@@ -115,7 +115,7 @@ The Broker listens only on `http://127.0.0.1:8890` and tries configured
 providers serially:
 
 ```text
-Brave -> Firecrawl -> Tavily -> Parallel
+Parallel -> Tavily -> Brave -> Firecrawl
 ```
 
 It stops after the first successful provider, so one search does not consume all
