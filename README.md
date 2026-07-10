@@ -131,7 +131,7 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 
 ## Optional API Pool
 
-The installer also deploys a local API Pool Broker at `http://127.0.0.1:8890`.
+The installer includes the API Pool code, but it is disabled by default and the Broker is not started.
 SearXNG sees it as one `api pool` engine, while the Broker tries providers in this
 order by default:
 
@@ -139,9 +139,13 @@ order by default:
 Brave -> Firecrawl -> Tavily -> Parallel
 ```
 
+Enable it explicitly by changing the `api pool` entry in
+`config/settings.yml` from `disabled: true` to `disabled: false`, then add at
+least one API key to `config/api-pool.env` and restart SearXNG.
+
 Only the first successful provider is used. Quota exhaustion, rate limits, and
 transient failures automatically fall through to the next configured provider.
-With no API keys configured, the Broker returns an empty API result and ordinary
+When the engine remains disabled, the Broker is skipped entirely and ordinary
 SearXNG free-web engines continue normally.
 
 Edit the installed file:

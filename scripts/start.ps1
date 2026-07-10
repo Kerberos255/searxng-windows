@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $RunScript = Join-Path $Root "scripts\run.ps1"
 $BrokerRunScript = Join-Path $Root "scripts\run_broker.ps1"
+$ApiPoolHelper = Join-Path $Root "scripts\api-pool.ps1"
 $PidFile = Join-Path $Root "searxng.pid"
 $BrokerPidFile = Join-Path $Root "broker.pid"
 $Log = Join-Path $Root "searxng-run.log"
@@ -17,65 +18,76 @@ $BrokerErrLog = Join-Path $Root "broker-run.err.log"
 $Url = "http://127.0.0.1:8888/"
 $BrokerUrl = "http://127.0.0.1:8890/health"
 
+if (!(Test-Path $ApiPoolHelper)) {
+    Write-Host "API Pool helper not found: $ApiPoolHelper"
+    exit 1
+}
+. $ApiPoolHelper
+$ApiPoolEnabled = Test-ApiPoolEnabled -Root $Root
+
 if (!$EnvFile) {
     $EnvFile = Join-Path $Root "config\api-pool.env"
 }
 
-$BrokerRunning = $false
-try {
-    $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 3
-    if ($r.StatusCode -eq 200) {
-        Write-Host "API Pool Broker is already running: $BrokerUrl"
-        $BrokerRunning = $true
-    }
-} catch {
-}
-
-if (!$BrokerRunning -and (Test-Path $BrokerPidFile)) {
-    $OldPid = Get-Content -LiteralPath $BrokerPidFile -ErrorAction SilentlyContinue
-    if ($OldPid -and (Get-Process -Id $OldPid -ErrorAction SilentlyContinue)) {
-        Write-Host "API Pool Broker launcher already exists, PID: $OldPid"
-        $BrokerRunning = $true
-    } else {
-        Remove-Item -LiteralPath $BrokerPidFile -Force -ErrorAction SilentlyContinue
-    }
-}
-
-if (!$BrokerRunning) {
-    Remove-Item -LiteralPath $BrokerLog -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $BrokerErrLog -Force -ErrorAction SilentlyContinue
-
-    $BrokerArgs = @(
-        "-ExecutionPolicy", "Bypass",
-        "-File", $BrokerRunScript,
-        "-Root", $Root,
-        "-EnvFile", $EnvFile
-    )
-    if ($ProxyUrl) {
-        $BrokerArgs += @("-ProxyUrl", $ProxyUrl)
-    }
-
-    $BrokerProcess = Start-Process `
-        -FilePath "powershell.exe" `
-        -ArgumentList $BrokerArgs `
-        -WorkingDirectory $Root `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $BrokerLog `
-        -RedirectStandardError $BrokerErrLog `
-        -PassThru
-
-    Set-Content -LiteralPath $BrokerPidFile -Value $BrokerProcess.Id -Encoding ASCII
-    Start-Sleep -Seconds 4
-
+if ($ApiPoolEnabled) {
+    $BrokerRunning = $false
     try {
-        $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 5
-        Write-Host "API Pool Broker started: $BrokerUrl"
+        $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 3
+        if ($r.StatusCode -eq 200) {
+            Write-Host "API Pool Broker is already running: $BrokerUrl"
+            $BrokerRunning = $true
+        }
     } catch {
-        Write-Host "API Pool Broker did not respond. Check logs:"
-        Write-Host $BrokerLog
-        Write-Host $BrokerErrLog
-        exit 1
     }
+
+    if (!$BrokerRunning -and (Test-Path $BrokerPidFile)) {
+        $OldPid = Get-Content -LiteralPath $BrokerPidFile -ErrorAction SilentlyContinue
+        if ($OldPid -and (Get-Process -Id $OldPid -ErrorAction SilentlyContinue)) {
+            Write-Host "API Pool Broker launcher already exists, PID: $OldPid"
+            $BrokerRunning = $true
+        } else {
+            Remove-Item -LiteralPath $BrokerPidFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (!$BrokerRunning) {
+        Remove-Item -LiteralPath $BrokerLog -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $BrokerErrLog -Force -ErrorAction SilentlyContinue
+
+        $BrokerArgs = @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", $BrokerRunScript,
+            "-Root", $Root,
+            "-EnvFile", $EnvFile
+        )
+        if ($ProxyUrl) {
+            $BrokerArgs += @("-ProxyUrl", $ProxyUrl)
+        }
+
+        $BrokerProcess = Start-Process `
+            -FilePath "powershell.exe" `
+            -ArgumentList $BrokerArgs `
+            -WorkingDirectory $Root `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $BrokerLog `
+            -RedirectStandardError $BrokerErrLog `
+            -PassThru
+
+        Set-Content -LiteralPath $BrokerPidFile -Value $BrokerProcess.Id -Encoding ASCII
+        Start-Sleep -Seconds 4
+
+        try {
+            $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 5
+            Write-Host "API Pool Broker started: $BrokerUrl"
+        } catch {
+            Write-Host "API Pool Broker did not respond. Check logs:"
+            Write-Host $BrokerLog
+            Write-Host $BrokerErrLog
+            exit 1
+        }
+    }
+} else {
+    Write-Host "API Pool is disabled in config\settings.yml; Broker startup skipped."
 }
 
 try {
