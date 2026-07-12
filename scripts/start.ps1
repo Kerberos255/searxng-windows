@@ -74,13 +74,23 @@ if ($ApiPoolEnabled) {
             -PassThru
 
         Set-Content -LiteralPath $BrokerPidFile -Value $BrokerProcess.Id -Encoding ASCII
-        Start-Sleep -Seconds 4
+        $BrokerReady = $false
+        for ($Attempt = 1; $Attempt -le 15; $Attempt++) {
+            Start-Sleep -Seconds 2
+            try {
+                $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 3
+                if ($r.StatusCode -eq 200) {
+                    $BrokerReady = $true
+                    break
+                }
+            } catch {
+            }
+        }
 
-        try {
-            $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 5
+        if ($BrokerReady) {
             Write-Host "API Pool Broker started: $BrokerUrl"
-        } catch {
-            Write-Host "API Pool Broker did not respond. Check logs:"
+        } else {
+            Write-Host "API Pool Broker did not respond after 30 seconds. Check logs:"
             Write-Host $BrokerLog
             Write-Host $BrokerErrLog
             exit 1
