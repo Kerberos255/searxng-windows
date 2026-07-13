@@ -1,19 +1,35 @@
-# SearXNG Windows for OpenClaw
+# searxng-windows
 
 English | [简体中文](README.zh-CN.md)
 
-A native Windows installer and maintenance toolkit for running a private local
-SearXNG instance for OpenClaw. Docker is not required.
+A native Windows installer and maintenance toolkit for running a self-hosted
+SearXNG instance without Docker. Use it directly in a browser or as a local
+SearXNG-compatible search backend for tools and AI agents, including OpenClaw.
 
 ## Highlights
 
-- Runs locally at `http://127.0.0.1:8888`
+- Installs and runs SearXNG natively on Windows; Docker is not required
+- Listens locally at `http://127.0.0.1:8888`
+- Includes an optional API-first fallback gateway for Parallel, Tavily, Brave,
+  Firecrawl, and free SearXNG engines
+- Stops after the first API provider with results, then uses
+  Bing/Sogou/Qwant/Mojeek only when the API tier is unavailable or empty
 - Uses standard Python and a virtual environment
 - Supports optional outbound proxy settings
 - Includes install, start, stop, update, health-check, and logon-startup scripts
 - Applies the required Windows compatibility patch automatically
-- Includes an optional API Pool for Brave, Firecrawl, Tavily, and Parallel
 - Keeps API keys, local state, logs, and generated configuration out of Git
+
+## Who is this for?
+
+- Windows users who want a local SearXNG instance without Docker Desktop
+- Developers and AI-agent users who need a local SearXNG-compatible HTTP endpoint
+- Users who prefer to control configuration, logs, and proxy routing on their own PC
+- Anyone who wants serial API fallback without caching provider results
+
+> SearXNG and the optional API Pool are self-hosted gateways, not offline search
+> indexes. Queries are still sent to configured upstream search engines or API
+> providers, so do not include passwords, API keys, or other sensitive data.
 
 ## Requirements
 
@@ -28,14 +44,14 @@ SearXNG instance for OpenClaw. Docker is not required.
    - `install-searxng-windows.cmd`
    - `install-searxng-windows.ps1`
 2. Double-click `install-searxng-windows.cmd`.
-3. Start SearXNG and run the health check:
+3. Open `%USERPROFILE%\Apps\searxng-windows` and double-click
+   `start-searxng.cmd`.
+4. Optionally double-click `check-searxng.cmd` to verify the services and run a
+   test search.
+5. Open `http://127.0.0.1:8888`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\start.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\scripts\check.ps1"
-```
-
-4. Open `http://127.0.0.1:8888`.
+The PowerShell scripts under `scripts\` remain available for automation and
+advanced options.
 
 The default installation directory is:
 
@@ -118,7 +134,7 @@ API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 
 The Broker starts only while the API Pool is enabled. It listens on
 `http://127.0.0.1:8890`, exposes a SearXNG-compatible search endpoint for
-OpenClaw, and uses this sequence:
+clients such as OpenClaw, and uses this sequence:
 
 ```text
 Parallel -> Tavily -> Brave -> Firecrawl -> Bing/Sogou/Qwant/Mojeek free fallback
@@ -128,8 +144,8 @@ It stops after the first API provider with results, so one search does not
 consume all configured quotas. Empty results continue to the next API provider.
 Only when the complete API tier is unavailable or empty does the gateway query
 the free Bing, Sogou, Qwant, and Mojeek engines through SearXNG on port `8888`.
-When the API Pool is disabled, OpenClaw should remain on port `8888` and use ordinary
-SearXNG directly. Exact filters use `date_after` and `date_before` in
+When the API Pool is disabled, clients should remain on port `8888` and use
+ordinary SearXNG directly. Exact filters use `date_after` and `date_before` in
 `YYYY-MM-DD` format. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
 state, and fallback details.
 
@@ -156,6 +172,16 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 ```
 
 ## Common Operations
+
+For normal desktop use, double-click these files in the installation directory:
+
+```text
+start-searxng.cmd   Start SearXNG and the optional API Pool
+stop-searxng.cmd    Stop the local services
+check-searxng.cmd   Check status and run a test search
+```
+
+The command-line equivalents are:
 
 ```powershell
 $Root = "$env:USERPROFILE\Apps\searxng-windows"

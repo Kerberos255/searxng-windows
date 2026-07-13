@@ -12,6 +12,11 @@ $Venv = Join-Path $Root ".venv"
 $Python = Join-Path $Venv "Scripts\python.exe"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptRoot
+$LauncherNames = @(
+    "start-searxng.cmd",
+    "stop-searxng.cmd",
+    "check-searxng.cmd"
+)
 
 $PythonCommand = Get-Command $RuntimePython -ErrorAction SilentlyContinue
 
@@ -38,6 +43,9 @@ if ((Resolve-Path -LiteralPath $RepoRoot).Path -ne (Resolve-Path -LiteralPath $R
     Copy-Item -Path (Join-Path $RepoRoot "patches\*") -Destination (Join-Path $Root "patches") -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot "config\settings.example.yml") -Destination (Join-Path $Root "config\settings.example.yml") -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot "config\api-pool.env.example") -Destination (Join-Path $Root "config\api-pool.env.example") -Force
+    foreach ($LauncherName in $LauncherNames) {
+        Copy-Item -LiteralPath (Join-Path $RepoRoot $LauncherName) -Destination (Join-Path $Root $LauncherName) -Force
+    }
 }
 
 $ApiPoolEnv = Join-Path $Root "config\api-pool.env"
@@ -101,4 +109,5 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Install finished."
 Write-Host "Create config\settings.yml from config\settings.example.yml if needed."
-Write-Host "Then run: powershell -ExecutionPolicy Bypass -File $Root\scripts\start.ps1"
+Write-Host "Then double-click: $Root\start-searxng.cmd"
+Write-Host "PowerShell alternative: powershell -ExecutionPolicy Bypass -File $Root\scripts\start.ps1"

@@ -105,6 +105,21 @@ class TestPublicPackageSafety(unittest.TestCase):
                 findings.append(relative_text)
         self.assertEqual(findings, [])
 
+    def test_clickable_launchers_are_public_and_installed(self):
+        launchers = {
+            "start-searxng.cmd": "scripts\\start.ps1",
+            "stop-searxng.cmd": "scripts\\stop.ps1",
+            "check-searxng.cmd": "scripts\\check.ps1",
+        }
+        installer = (REPO_ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8")
+        for name, target in launchers.items():
+            path = REPO_ROOT / name
+            self.assertTrue(path.is_file(), name)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("%~dp0", text)
+            self.assertIn(target, text)
+            self.assertIn(name, installer)
+
     def test_engine_patch_license_and_template_entry(self):
         engine = (REPO_ROOT / "patches" / "api_pool.py").read_text(encoding="utf-8")
         settings = (REPO_ROOT / "config" / "settings.example.yml").read_text(encoding="utf-8")
