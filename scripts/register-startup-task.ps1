@@ -1,6 +1,6 @@
 param(
     [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
-    [string]$TaskName = "OpenClaw SearXNG"
+    [string]$TaskName = "SearXNG Local"
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,5 +17,5 @@ $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $User
 $Settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 0)
 $Principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited
 
-Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal -Description "Start local SearXNG for OpenClaw at user logon." -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal -Description "Start local SearXNG at user logon." -Force | Out-Null
 Get-ScheduledTask -TaskName $TaskName | Select-Object TaskName,State,TaskPath

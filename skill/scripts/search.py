@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query the local OpenClaw SearXNG instance."""
+"""Query a local SearXNG instance."""
 
 import argparse
 import json

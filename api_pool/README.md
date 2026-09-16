@@ -1,9 +1,9 @@
 # API Pool Broker
 
 The API Pool is a local-only search broker. It can be used either as one SearXNG
-engine or as a SearXNG-compatible gateway for OpenClaw. It tries API providers
-serially and stops after the first non-empty successful response, so multiple
-quotas are not consumed by every search.
+engine or as a SearXNG-compatible gateway for local tools and AI agents. It tries
+API providers serially and stops after the first non-empty successful response,
+so multiple quotas are not consumed by every search.
 
 Default order:
 
@@ -29,8 +29,7 @@ API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
 The real `config/api-pool.env` is ignored by Git. Process environment variables
-take precedence over the env file. `OPENCLAW_BRAVE_API_KEY` is also accepted as
-a compatibility alias for `BRAVE_API_KEY`.
+take precedence over the env file.
 
 ## Behavior
 
@@ -76,8 +75,8 @@ Example request:
 }
 ```
 
-For OpenClaw, keep the SearXNG plugin on `http://127.0.0.1:8888` while the API
-Pool is disabled. After enabling the API Pool, point the plugin at
+SearXNG-compatible clients should use `http://127.0.0.1:8888` while the API Pool
+is disabled. After enabling the API Pool, point the client at
 `http://127.0.0.1:8890` to use the serial API-first chain. The gateway falls
 back to `SEARXNG_BACKEND_URL` only when the API tier produces no results.
 

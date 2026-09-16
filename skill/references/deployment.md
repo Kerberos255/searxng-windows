@@ -30,7 +30,7 @@
 
 ## Optional API-First Gateway
 
-- `8888`: normal SearXNG UI and search API; this is the default OpenClaw target.
+- `8888`: normal SearXNG UI and search API; this is the default client endpoint.
 - `8890`: optional API Pool gateway; it starts only when the `api pool` engine is
   enabled in `config\settings.yml`.
 - Enabled provider order: `Parallel -> Tavily -> Brave -> Firecrawl`.
@@ -39,7 +39,7 @@
 - Exact filters: `date_after` and `date_before` in `YYYY-MM-DD` format.
 - API keys stay in `config\api-pool.env`; provider counters and cooldown state
   stay in `api_pool\data\api_pool.sqlite`.
-- When the API Pool is disabled, OpenClaw remains on `8888` and uses ordinary
+- When the API Pool is disabled, clients remain on `8888` and use ordinary
   SearXNG directly.
 
 ## Important Config
@@ -77,7 +77,7 @@ ui:
   default_locale: "zh-Hans-CN"
 
 engines:
-  # Disabled by default. Enable this only when OpenClaw will use port 8890.
+  # Disabled by default. Enable this only when clients should use port 8890.
   - name: api pool
     engine: api_pool
     disabled: true
@@ -96,7 +96,8 @@ engines:
     disabled: true
 ```
 
-`scripts\run.ps1` should always set SearXNG settings path. Proxy environment variables should only be set when `-ProxyUrl` is provided:
+`scripts\run.ps1` should always set the SearXNG settings path. Proxy environment
+variables should only be set when `-ProxyUrl` is provided:
 
 ```powershell
 $env:SEARXNG_SETTINGS_PATH = $Settings
@@ -111,16 +112,8 @@ if ($ProxyUrl) {
 
 ## Engine Counts
 
-As of this deployment:
-
-- Engine Python modules: 236
-- Configured engine instances: 321
-- Enabled after local overrides: 82
-- Disabled after local overrides: 190
-- Inactive: 49
-- Enabled general-category instances: about 55
-
-Recompute counts with:
+Engine counts vary with the upstream SearXNG version. Recompute them against the
+installed source and local overrides instead of relying on a hard-coded count:
 
 ```powershell
 @'
@@ -150,21 +143,21 @@ print(len(engines), active, disabled, inactive)
 
 Scheduled Task:
 
-- Name: `OpenClaw SearXNG`
+- Name: `SearXNG Local`
 - Trigger: user logon
 - Action: `wscript.exe "<deploy-root>\scripts\start-hidden.vbs"`
 
 Check it:
 
 ```powershell
-Get-ScheduledTask -TaskName 'OpenClaw SearXNG'
-Get-ScheduledTaskInfo -TaskName 'OpenClaw SearXNG'
+Get-ScheduledTask -TaskName 'SearXNG Local'
+Get-ScheduledTaskInfo -TaskName 'SearXNG Local'
 ```
 
 Manually trigger it:
 
 ```powershell
-Start-ScheduledTask -TaskName 'OpenClaw SearXNG'
+Start-ScheduledTask -TaskName 'SearXNG Local'
 ```
 
 ## Common Problems
@@ -195,10 +188,7 @@ Run:
 powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\apply-windows-patch.ps1
 ```
 
-### OpenClaw still uses old search provider
+### Client still uses the old endpoint
 
-Check `<openclaw-home>\.openclaw\openclaw.json`, `<openclaw-home>\openclaw.cmd`, then restart:
-
-```powershell
-<openclaw-home>\restart-openclaw.cmd
-```
+Verify the client's configured SearXNG base URL. Use `http://127.0.0.1:8888` for
+ordinary SearXNG, or `http://127.0.0.1:8890` only when the API Pool is enabled.

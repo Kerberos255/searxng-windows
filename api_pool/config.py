@@ -16,7 +16,7 @@ DEFAULT_ENV_FILE = ROOT_DIR / "config" / "api-pool.env"
 ENV_FILE = Path(os.environ.get("API_POOL_ENV_FILE", str(DEFAULT_ENV_FILE))).expanduser()
 
 _PROVIDER_KEY_ALIASES: dict[str, tuple[str, ...]] = {
-    "brave": ("BRAVE_API_KEY", "OPENCLAW_BRAVE_API_KEY"),
+    "brave": ("BRAVE_API_KEY",),
     "firecrawl": ("FIRECRAWL_API_KEY",),
     "tavily": ("TAVILY_API_KEY",),
     "parallel": ("PARALLEL_API_KEY",),

@@ -66,8 +66,8 @@ class TestPublicConfiguration(unittest.TestCase):
 
 class TestPublicPackageSafety(unittest.TestCase):
     def test_no_private_local_paths_in_package(self):
-        forbidden = ("E:" + "\\openclaw").lower()
-        private_env = (".config" + "\\openclaw.env").lower()
+        forbidden = ("C:" + "\\Users\\developer\\PrivateWorkspace").lower()
+        private_env = (".config" + "\\private-runtime.env").lower()
         runtime_roots = {
             ".venv",
             ".pytest_cache",
@@ -136,7 +136,6 @@ class TestPublicPackageSafety(unittest.TestCase):
         )
         self.assertIn('method: "GET"', deployment)
 
-
     def test_lifecycle_scripts_treat_api_pool_as_opt_in(self):
         start = (REPO_ROOT / "scripts" / "start.ps1").read_text(encoding="utf-8")
         check = (REPO_ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
@@ -146,7 +145,6 @@ class TestPublicPackageSafety(unittest.TestCase):
         self.assertIn("Broker startup skipped", start)
         self.assertIn("if ($ApiPoolEnabled)", check)
         self.assertIn("Broker checks skipped", check)
-
 
     def test_release_workflow_is_gated_by_validation(self):
         workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")

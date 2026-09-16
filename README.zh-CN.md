@@ -3,8 +3,8 @@
 [English](README.md) | 简体中文
 
 这是一套 Windows 原生 SearXNG 安装与维护工具，不需要 Docker。既可以直接在
-浏览器中使用，也可以作为本地、兼容 SearXNG 接口的搜索后端，供 OpenClaw 等
-工具和 AI Agent 调用。
+浏览器中使用，也可以作为本地、兼容 SearXNG 接口的搜索后端，供工具和 AI
+Agent 调用。
 
 ## 主要功能
 
@@ -61,48 +61,22 @@ bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG
 环境、安装依赖、生成本地 `secret_key`，并应用 Windows 补丁。已有的
 `config/settings.yml` 和 `config/api-pool.env` 会被保留。
 
-## OpenClaw 集成
+## 客户端接入
 
-默认把 OpenClaw 的网页搜索后端设置为 `8888` 端口上的普通 SearXNG：
+普通本地 SearXNG 地址为：
 
-```json
-{
-  "tools": {
-    "web": {
-      "search": {
-        "provider": "searxng",
-        "enabled": true,
-        "maxResults": 10,
-        "timeoutSeconds": 30
-      }
-    }
-  },
-  "plugins": {
-    "entries": {
-      "searxng": {
-        "enabled": true,
-        "config": {
-          "webSearch": {
-            "baseUrl": "http://127.0.0.1:8888",
-            "language": "",
-            "categories": "general"
-          }
-        }
-      }
-    }
-  }
-}
+```text
+http://127.0.0.1:8888
 ```
 
-同时在 OpenClaw 启动环境中设置：
+兼容 SearXNG 的客户端可以直接调用标准 JSON 搜索接口，例如：
 
-```cmd
-set "SEARXNG_URL=http://127.0.0.1:8888"
-set "SEARXNG_BASE_URL=http://127.0.0.1:8888"
+```text
+http://127.0.0.1:8888/search?q=example&format=json
 ```
 
-修改后重启 OpenClaw。API Pool 未启用时保持使用 `8888`；启用下面的 API
-Pool 后，再把上述三个 URL 改成 `8890`。
+API Pool 未启用时，客户端保持使用 `8888`。启用下面的 API Pool 后，需要走
+API-first 链路的客户端可改用 `8890`。如果客户端会缓存接口地址，修改后请重启。
 
 ## 可选 API Pool
 
@@ -123,12 +97,11 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. 把 OpenClaw 的 `baseUrl`、`SEARXNG_URL` 和 `SEARXNG_BASE_URL` 从
-   `8888` 改成 `8890`。
-5. 重启 SearXNG 和 OpenClaw。
+4. 将需要使用 API-first 链路的客户端基础地址从 `8888` 改成 `8890`。
+5. 重启 SearXNG，以及会缓存接口地址的客户端。
 
-Broker 只在 API Pool 启用时启动，监听 `http://127.0.0.1:8890`，为 OpenClaw
-等客户端提供兼容 SearXNG 的搜索入口，并按以下顺序执行：
+Broker 只在 API Pool 启用时启动，监听 `http://127.0.0.1:8890`，提供兼容
+SearXNG 的搜索入口，并按以下顺序执行：
 
 ```text
 Parallel → Tavily → Brave → Firecrawl → Bing/Sogou/Qwant/Mojeek 免费兜底
@@ -233,7 +206,7 @@ broker-run.err.log
 - Python 虚拟环境或 SearXNG 源码副本
 - 生成后的 `config/settings.yml` 或真实 API Key
 - `config/api-pool.env`、SQLite 状态、日志、PID 或下载文件
-- 私有 OpenClaw 配置
+- 机器特定的客户端配置
 
 ## CI 与 Release
 

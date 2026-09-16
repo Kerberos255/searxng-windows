@@ -1,11 +1,11 @@
 ---
 name: searxng
-description: Use when Codex needs to operate, diagnose, maintain, or query a local Windows SearXNG deployment for OpenClaw, including web search via the local JSON API, start/stop/update scripts, proxy troubleshooting, OpenClaw integration, engine enable/disable decisions, and startup task management.
+description: Use when Codex needs to operate, diagnose, maintain, or query a local Windows SearXNG deployment, including web search via the local JSON API, start/stop/update scripts, proxy troubleshooting, client integration, engine enable/disable decisions, and startup task management.
 ---
 
-# Local SearXNG for OpenClaw
+# Local SearXNG on Windows
 
-This skill covers the local Windows SearXNG instance deployed for OpenClaw.
+This skill covers the local Windows SearXNG deployment provided by this repository.
 
 ## Path Conventions
 
@@ -13,8 +13,6 @@ This skill covers the local Windows SearXNG instance deployed for OpenClaw.
 - Source: `<deploy-root>\searxng`
 - Virtualenv Python: `<deploy-root>\.venv\Scripts\python.exe`
 - SearXNG config: `<deploy-root>\config\settings.yml`
-- OpenClaw config: `<openclaw-home>\.openclaw\openclaw.json`
-- OpenClaw launcher: `<openclaw-home>\openclaw.cmd`
 - Normal SearXNG backend/UI: `http://127.0.0.1:8888`
 - Optional API Pool gateway: `http://127.0.0.1:8890`
 - Optional example local proxy for outbound search-engine traffic: `http://127.0.0.1:10808`
@@ -30,91 +28,60 @@ powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\update.ps1
 powershell -ExecutionPolicy Bypass -File <deploy-root>\scripts\check.ps1
 ```
 
-Proxy is disabled by default. If direct search-engine access times out, pass `-ProxyUrl "http://127.0.0.1:10808"` to `start.ps1` or `run.ps1`, and uncomment the `outgoing.proxies` block in `config\settings.yml`.
+Proxy is disabled by default. If direct search-engine access times out, pass
+`-ProxyUrl "http://127.0.0.1:10808"` to `start.ps1` or `run.ps1`, and uncomment
+the `outgoing.proxies` block in `config\settings.yml`.
 
-Use `scripts/search.py` in this skill for quick JSON/table search checks. It uses ordinary SearXNG on `8888` by default; set `SEARXNG_URL` to `8890` only when the API Pool is enabled:
+Use `scripts/search.py` in this skill for quick JSON/table search checks. It uses
+ordinary SearXNG on `8888` by default; set `SEARXNG_URL` to `8890` only when the
+API Pool is enabled:
 
 ```powershell
 $env:SEARXNG_URL='http://127.0.0.1:8888'
 python <skill-root>\scripts\search.py search "openai" --format json -n 3
 ```
 
-## Current Deployment Facts
+## Deployment Facts
 
-- Installed from the official GitHub source zip because `git clone/fetch` timed out.
+- SearXNG can be installed from the official GitHub source archive when Git is unavailable.
 - SearXNG is installed editable into the venv with `pip install --no-build-isolation -e .`.
 - A Windows compatibility patch is applied to `searx\valkeydb.py` because upstream imports Unix-only `pwd`.
-- The `update.ps1` script stops SearXNG if running, updates source/dependencies, reapplies the Windows patch, and restarts if it was running.
-- A Windows Scheduled Task named `OpenClaw SearXNG` starts SearXNG at user logon via `scripts\start-hidden.vbs`.
+- `update.ps1` stops SearXNG if running, updates source/dependencies, reapplies the Windows patch, and restarts it when appropriate.
+- The optional Windows Scheduled Task defaults to `SearXNG Local` and starts SearXNG at user logon via `scripts\start-hidden.vbs`.
 
-## OpenClaw Integration
+## Client Integration
 
-OpenClaw should use local SearXNG through:
+SearXNG-compatible clients should use `http://127.0.0.1:8888` by default.
+Only when `config\settings.yml` enables the `api pool` engine should clients that
+need the API-first chain switch to `http://127.0.0.1:8890`.
 
-```json
-"tools": {
-  "web": {
-    "search": {
-      "provider": "searxng",
-      "enabled": true,
-      "maxResults": 10,
-      "timeoutSeconds": 30
-    }
-  }
-}
-```
+The standard JSON endpoint is:
 
-Use port `8888` in the plugin config by default:
-
-```json
-"searxng": {
-  "enabled": true,
-  "config": {
-    "webSearch": {
-      "baseUrl": "http://127.0.0.1:8888",
-      "language": "",
-      "categories": "general"
-    }
-  }
-}
-```
-
-The OpenClaw launcher should also use port `8888` by default:
-
-```cmd
-set "SEARXNG_URL=http://127.0.0.1:8888"
-set "SEARXNG_BASE_URL=http://127.0.0.1:8888"
-```
-
-Only when `config\settings.yml` enables the `api pool` engine should all three URLs be changed to `http://127.0.0.1:8890`. Restart OpenClaw Gateway after configuration changes:
-
-```powershell
-<openclaw-home>\restart-openclaw.cmd
+```text
+http://127.0.0.1:8888/search?q=example&format=json
 ```
 
 ## Search Behavior
 
-With the API Pool disabled, the Broker is not started and OpenClaw should query ordinary SearXNG directly on port `8888`.
+With the API Pool disabled, the Broker is not started and clients should query
+ordinary SearXNG directly on port `8888`.
 
-With the API Pool enabled, OpenClaw may query the API-first gateway on port `8890`. It tries `Parallel -> Tavily -> Brave -> Firecrawl` serially and returns the first non-empty result set. Only when every API provider is unavailable or empty does it query the free Bing/Sogou/Qwant/Mojeek engines through SearXNG on port `8888`.
+With the API Pool enabled, clients may query the API-first gateway on port `8890`.
+It tries `Parallel -> Tavily -> Brave -> Firecrawl` serially and returns the first
+non-empty result set. Only when every API provider is unavailable or empty does it
+query the free Bing/Sogou/Qwant/Mojeek engines through SearXNG on port `8888`.
 
-The gateway accepts `time_range` (`day`, `week`, `month`, `year`) plus exact `date_after` and `date_before` values in `YYYY-MM-DD` format. Direct SearXNG supports only the coarse `time_range` values. Parallel supports only the lower date bound, so requests containing `date_before` skip it and continue with Tavily.
+The gateway accepts `time_range` (`day`, `week`, `month`, `year`) plus exact
+`date_after` and `date_before` values in `YYYY-MM-DD` format. Direct SearXNG
+supports only the coarse `time_range` values. Parallel supports only the lower
+date bound, so requests containing `date_before` skip it and continue with Tavily.
 
-DuckDuckGo is disabled locally because it frequently returned CAPTCHA. Current disabled overrides include:
+DuckDuckGo variants are disabled in the public template because shared or proxied
+traffic can frequently trigger CAPTCHA challenges.
 
-```yaml
-engines:
-  - name: duckduckgo
-    disabled: true
-  - name: duckduckgo images
-    disabled: true
-  - name: duckduckgo videos
-    disabled: true
-  - name: duckduckgo news
-    disabled: true
-```
-
-Brave in SearXNG does not use the official Brave API. It scrapes `https://search.brave.com/` HTML and therefore requires no API key, but can be rate-limited. OpenClaw's native `brave` provider is different and requires `OPENCLAW_BRAVE_API_KEY`.
+Brave in SearXNG scrapes `https://search.brave.com/` HTML and therefore requires
+no API key, but can be rate-limited. The API Pool Brave provider is separate and
+uses the official `BRAVE_API_KEY`.
 
 ## Diagnostics Workflow
 
@@ -149,8 +116,10 @@ Get-NetTCPConnection -State Listen -LocalPort 8888,8890
 Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*searxng_windows*' -or $_.CommandLine -like '*searx\webapp.py*' }
 ```
 
-5. If OpenClaw cannot search but the local API works, verify that `openclaw.json`, `SEARXNG_URL`, and `SEARXNG_BASE_URL` point to `8888` when the API Pool is disabled or `8890` when it is enabled, then restart the gateway.
+5. If a client cannot search but the local API works, verify that its configured
+   base URL points to `8888` when the API Pool is disabled or `8890` when it is enabled.
 
 ## References
 
-Read `references/deployment.md` when changing deployment, startup, update behavior, proxy settings, engine counts, or troubleshooting details.
+Read `references/deployment.md` when changing deployment, startup, update behavior,
+proxy settings, engine counts, or troubleshooting details.

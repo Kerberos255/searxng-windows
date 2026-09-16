@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A native Windows installer and maintenance toolkit for running a self-hosted
 SearXNG instance without Docker. Use it directly in a browser or as a local
-SearXNG-compatible search backend for tools and AI agents, including OpenClaw.
+SearXNG-compatible search backend for tools and AI agents.
 
 ## Highlights
 
@@ -61,53 +61,26 @@ The default installation directory is:
 
 The bootstrap installer resolves the latest Release by default, downloads that
 package and upstream SearXNG, creates a virtual environment, installs
-dependencies, generates a local
-`secret_key`, and applies the Windows patches. Existing `config/settings.yml`
-and `config/api-pool.env` files are preserved.
+dependencies, generates a local `secret_key`, and applies the Windows patches.
+Existing `config/settings.yml` and `config/api-pool.env` files are preserved.
 
-## OpenClaw Integration
+## Client Integration
 
-Configure OpenClaw to use the normal local SearXNG endpoint on port `8888`:
+The normal local SearXNG endpoint is:
 
-```json
-{
-  "tools": {
-    "web": {
-      "search": {
-        "provider": "searxng",
-        "enabled": true,
-        "maxResults": 10,
-        "timeoutSeconds": 30
-      }
-    }
-  },
-  "plugins": {
-    "entries": {
-      "searxng": {
-        "enabled": true,
-        "config": {
-          "webSearch": {
-            "baseUrl": "http://127.0.0.1:8888",
-            "language": "",
-            "categories": "general"
-          }
-        }
-      }
-    }
-  }
-}
+```text
+http://127.0.0.1:8888
 ```
 
-Also set the launcher environment variables:
+SearXNG-compatible clients can use the standard JSON search endpoint, for example:
 
-```cmd
-set "SEARXNG_URL=http://127.0.0.1:8888"
-set "SEARXNG_BASE_URL=http://127.0.0.1:8888"
+```text
+http://127.0.0.1:8888/search?q=example&format=json
 ```
 
-Restart OpenClaw after changing its configuration. Keep port `8888` while the
-API Pool is disabled. If you enable the API Pool below, switch all three URL
-settings to port `8890`.
+Keep clients on port `8888` while the API Pool is disabled. If you enable the
+API Pool below, point clients that should use the API-first chain at port `8890`.
+Clients may need to be restarted if they cache their configured endpoint.
 
 ## Optional API Pool
 
@@ -128,13 +101,13 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. Change OpenClaw's `baseUrl`, `SEARXNG_URL`, and `SEARXNG_BASE_URL` from
+4. Change the base URL of clients that should use the API-first chain from
    port `8888` to `8890`.
-5. Restart SearXNG and OpenClaw.
+5. Restart SearXNG and any client that caches its endpoint.
 
 The Broker starts only while the API Pool is enabled. It listens on
-`http://127.0.0.1:8890`, exposes a SearXNG-compatible search endpoint for
-clients such as OpenClaw, and uses this sequence:
+`http://127.0.0.1:8890`, exposes a SearXNG-compatible search endpoint, and uses
+this sequence:
 
 ```text
 Parallel -> Tavily -> Brave -> Firecrawl -> Bing/Sogou/Qwant/Mojeek free fallback
@@ -244,7 +217,7 @@ This repository intentionally does not contain:
 - a virtual environment or a copied SearXNG source tree
 - generated `config/settings.yml` or real API keys
 - `config/api-pool.env`, SQLite state, logs, PID files, or downloaded archives
-- private OpenClaw configuration
+- machine-specific client configuration
 
 ## CI and Releases
 

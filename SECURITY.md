@@ -7,7 +7,7 @@ Keep these out of Git:
 - `config/settings.yml`
 - SearXNG `secret_key`
 - GitHub tokens
-- OpenClaw private config files
+- machine-specific client configuration
 - `.venv/`
 - downloaded SearXNG source zips
 - SearXNG logs and PID files
