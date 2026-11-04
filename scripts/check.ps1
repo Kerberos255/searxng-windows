@@ -7,8 +7,16 @@ param(
 $ErrorActionPreference = "Stop"
 $AllOk = $true
 
-$ApiPoolHelper = Join-Path $Root "scripts\api-pool.ps1"
-if (!(Test-Path $ApiPoolHelper)) {
+try {
+    $Root = [System.IO.Path]::GetFullPath($Root)
+    $ApiPoolHelper = [System.IO.Path]::Combine($Root, "scripts\api-pool.ps1")
+} catch {
+    Write-Host "Invalid installation root path: $Root"
+    Write-Host $_
+    exit 1
+}
+
+if (![System.IO.File]::Exists($ApiPoolHelper)) {
     Write-Host "API Pool helper not found: $ApiPoolHelper"
     exit 1
 }
@@ -28,10 +36,7 @@ if ($ApiPoolEnabled) {
         }
 
         $BrokerQuery = [uri]::EscapeDataString("open source metasearch")
-        $BrokerSearch = Invoke-RestMethod `
-            -Uri "$BrokerUrl/search?q=$BrokerQuery&format=json&count=3" `
-            -Method Get `
-            -TimeoutSec 60
+        $BrokerSearch = Invoke-RestMethod -Uri "$BrokerUrl/search?q=$BrokerQuery&format=json&count=3" -Method Get -TimeoutSec 60
         $BrokerResults = @($BrokerSearch.results).Count
         Write-Host "API-first gateway works; provider=$($BrokerSearch.provider), fallback=$($BrokerSearch.fallback_used), results=$BrokerResults"
         if ($BrokerResults -le 0) { $AllOk = $false }
@@ -45,10 +50,7 @@ if ($ApiPoolEnabled) {
 
 try {
     $Encoded = [uri]::EscapeDataString("open source metasearch")
-    $Response = Invoke-RestMethod `
-        -Uri "$SearxngUrl/search?q=$Encoded&format=json&categories=general" `
-        -Method Get `
-        -TimeoutSec 30
+    $Response = Invoke-RestMethod -Uri "$SearxngUrl/search?q=$Encoded&format=json&categories=general" -Method Get -TimeoutSec 30
     $ResultCount = @($Response.results).Count
     Write-Host "SearXNG results:" $ResultCount
     if ($ResultCount -le 0) {
