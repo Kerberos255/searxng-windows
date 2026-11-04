@@ -91,3 +91,17 @@ python -m unittest discover -s api_pool\tests -v
 ```
 
 The test suite uses mocked upstream APIs and does not need real credentials.
+
+### Connection reuse and time limits
+
+The Broker reuses a small HTTP connection pool for each proxy mode and preserves
+sequential provider priority. Gateway requests default to a 27-second overall
+budget, reserving 10 seconds for the free SearXNG fallback; calls from the
+SearXNG engine adapter use a separate 17-second budget. Each provider is limited
+to the smaller of its own 15-second timeout and the remaining request budget.
+Connection and pool waits have shorter limits. These values can be overridden
+with the optional environment settings in `config/api-pool.env.example`.
+
+Diagnostic warnings are rotated (1 MiB, three backups). HTTP access logs with
+user search strings are disabled; exceptions are logged by provider and error
+type rather than by exposing search URLs or API credentials.

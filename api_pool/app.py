@@ -1,29 +1,24 @@
-"""API Pool Broker - Flask application for multi-provider search.
+"""API Pool Broker - Flask application for multi-provider search."""
 
-Endpoints:
-  GET  /health  - Service health check
-  GET  /status  - Provider status (no keys leaked)
-  GET  /search  - SearXNG-compatible API-first search gateway
-  POST /search  - Execute API provider search with priority/fallback logic
-"""
-
+import logging
 import os
+import re
 import sys
+import time
 from datetime import date
+from logging.handlers import RotatingFileHandler
 
-# Ensure the api_pool package is importable
+# Ensure the api_pool package is importable when app.py is launched directly.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import httpx
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 
-from api_pool import config
-from api_pool import state
-from api_pool.providers import brave, firecrawl, tavily, parallel
+from api_pool import config, state
+from api_pool.providers import brave, firecrawl, parallel, tavily
+from api_pool.providers.base import get_http_client
 
 app = Flask(__name__)
 
-# Provider dispatch table
 _PROVIDERS = {
     "brave": brave,
     "firecrawl": firecrawl,
@@ -31,9 +26,49 @@ _PROVIDERS = {
     "parallel": parallel,
 }
 
+_QUERY_URL_RE = re.compile(r'((?:https?://|/)[^\s?"<>]+)\?[^\s"<>]*')
+
+
+class QueryRedactionFilter(logging.Filter):
+    """Redact URL query strings from diagnostic messages."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except Exception:
+            return True
+        if isinstance(message, str):
+            record.msg = _QUERY_URL_RE.sub(r"\1?[REDACTED]", message)
+            record.args = ()
+        return True
+
+
+def _configure_logging() -> None:
+    """Retain warnings/errors with rotation and suppress query-bearing access logs."""
+    config.BROKER_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(
+        config.BROKER_LOG_FILE,
+        maxBytes=1_048_576,
+        backupCount=3,
+        encoding="utf-8",
+        delay=True,
+    )
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    handler.addFilter(QueryRedactionFilter())
+
+    for logger in (app.logger, logging.getLogger("api_pool"), logging.getLogger("werkzeug")):
+        for existing in list(logger.handlers):
+            logger.removeHandler(existing)
+            if existing is not handler:
+                existing.close()
+        logger.addHandler(handler)
+        logger.setLevel(logging.WARNING)
+        logger.propagate = False
+
 
 def _get_priority() -> list[str]:
-    """Get provider priority order from config or default."""
     return config.get_priority()
 
 
@@ -125,11 +160,22 @@ def _parse_search_input(data: dict):
     }, None
 
 
-def _run_api_search(search_input: dict) -> dict:
+def _run_api_search(search_input: dict, deadline: float | None = None) -> dict:
     priority = _get_priority()
     attempts = []
 
     for provider_name in priority:
+        remaining = (
+            deadline - time.monotonic()
+            if deadline is not None
+            else config.PROVIDER_REQUEST_TIMEOUT
+        )
+        if remaining <= 0:
+            attempts.append(
+                {"provider": provider_name, "outcome": "request_budget_exhausted"}
+            )
+            break
+
         if search_input["date_before"] and provider_name == "parallel":
             attempts.append(
                 {"provider": provider_name, "outcome": "unsupported_date_before"}
@@ -160,8 +206,7 @@ def _run_api_search(search_input: dict) -> dict:
 
         if prov_state and prov_state.get("status") == state.STATUS_COOLDOWN:
             cooldown_until = prov_state.get("cooldown_until")
-            now = __import__("time").time()
-            if cooldown_until and now < cooldown_until:
+            if cooldown_until and time.time() < cooldown_until:
                 attempts.append({"provider": provider_name, "outcome": "cooldown"})
                 continue
 
@@ -171,6 +216,18 @@ def _run_api_search(search_input: dict) -> dict:
                 attempts.append({"provider": provider_name, "outcome": "unknown_provider"})
                 continue
 
+            remaining = (
+                deadline - time.monotonic()
+                if deadline is not None
+                else config.PROVIDER_REQUEST_TIMEOUT
+            )
+            if remaining <= 0:
+                attempts.append(
+                    {"provider": provider_name, "outcome": "request_budget_exhausted"}
+                )
+                break
+            provider_timeout = min(config.PROVIDER_REQUEST_TIMEOUT, remaining)
+
             result = provider_mod.search(
                 query=search_input["query"],
                 pageno=search_input["pageno"],
@@ -179,6 +236,7 @@ def _run_api_search(search_input: dict) -> dict:
                 date_before=search_input["date_before"],
                 safesearch=search_input["safesearch"],
                 max_results=search_input["max_results"],
+                timeout=provider_timeout,
             )
 
             if result.success:
@@ -205,6 +263,9 @@ def _run_api_search(search_input: dict) -> dict:
                 {"provider": provider_name, "outcome": result.error_category or "error"}
             )
         except Exception as exc:
+            logging.getLogger("api_pool").warning(
+                "Provider %s failed with %s", provider_name, type(exc).__name__
+            )
             state.record_failure(
                 provider=provider_name,
                 http_status=None,
@@ -226,7 +287,11 @@ def _free_search_query(search_input: dict) -> str:
     return query
 
 
-def _run_free_search(search_input: dict, api_attempts: list[dict]) -> dict:
+def _run_free_search(
+    search_input: dict,
+    api_attempts: list[dict],
+    deadline: float | None = None,
+) -> dict:
     gateway_url = request.host_url.rstrip("/")
     if config.SEARXNG_BACKEND_URL == gateway_url:
         return {
@@ -250,13 +315,29 @@ def _run_free_search(search_input: dict, api_attempts: list[dict]) -> dict:
     if search_input["language"]:
         params["language"] = search_input["language"]
 
+    remaining = (
+        deadline - time.monotonic()
+        if deadline is not None
+        else config.SEARXNG_FALLBACK_TIMEOUT
+    )
+    if remaining <= 0:
+        return {
+            "query": search_input["query"],
+            "provider": None,
+            "results": [],
+            "attempts": api_attempts
+            + [{"provider": "searxng_free", "outcome": "request_budget_exhausted"}],
+            "fallback_used": True,
+        }
+
+    timeout = min(config.SEARXNG_FALLBACK_TIMEOUT, remaining)
     try:
-        with httpx.Client(
-            timeout=config.SEARXNG_FALLBACK_TIMEOUT,
-            follow_redirects=True,
-            trust_env=False,
-        ) as client:
-            response = client.get(f"{config.SEARXNG_BACKEND_URL}/search", params=params)
+        with get_http_client(trust_env=False) as client:
+            response = client.get(
+                f"{config.SEARXNG_BACKEND_URL}/search",
+                params=params,
+                timeout=timeout,
+            )
         response.raise_for_status()
         data = response.json()
         if not isinstance(data, dict):
@@ -270,6 +351,9 @@ def _run_free_search(search_input: dict, api_attempts: list[dict]) -> dict:
         data["fallback_used"] = True
         return data
     except Exception as exc:
+        logging.getLogger("api_pool").warning(
+            "Free SearXNG fallback failed with %s", type(exc).__name__
+        )
         return {
             "query": search_input["query"],
             "provider": None,
@@ -284,7 +368,6 @@ def _run_free_search(search_input: dict, api_attempts: list[dict]) -> dict:
 def health():
     """Health check endpoint."""
     try:
-        state.init_db()
         count = len(state.get_all_provider_states())
         return jsonify({"status": "ok", "providers_tracked": count}), 200
     except Exception as exc:
@@ -294,58 +377,41 @@ def health():
 @app.route("/status", methods=["GET"])
 def status():
     """Provider status overview - no keys exposed."""
-    state.init_db()
     default_priority = _get_priority()
     all_states = state.get_all_provider_states()
     configured = config.get_configured_providers()
 
     providers_info = []
-    state_map = {s["provider"]: s for s in all_states}
+    state_map = {item["provider"]: item for item in all_states}
 
-    for prov in default_priority:
-        s = state_map.get(prov, {})
+    for provider in default_priority:
+        item = state_map.get(provider, {})
         providers_info.append(
             {
-                "provider": prov,
-                "configured": configured.get(prov, False),
-                "status": s.get("status", "unknown"),
-                "cooldown_until": s.get("cooldown_until"),
-                "probe_after": s.get("probe_after"),
-                "consecutive_failures": s.get("consecutive_failures", 0),
-                "last_error_category": s.get("last_error_category"),
-                "last_success_at": s.get("last_success_at"),
-                "last_attempt_at": s.get("last_attempt_at"),
-                "request_count": s.get("request_count", 0),
-                "success_count": s.get("success_count", 0),
+                "provider": provider,
+                "configured": configured.get(provider, False),
+                "status": item.get("status", "unknown"),
+                "cooldown_until": item.get("cooldown_until"),
+                "probe_after": item.get("probe_after"),
+                "consecutive_failures": item.get("consecutive_failures", 0),
+                "last_error_category": item.get("last_error_category"),
+                "last_success_at": item.get("last_success_at"),
+                "last_attempt_at": item.get("last_attempt_at"),
+                "request_count": item.get("request_count", 0),
+                "success_count": item.get("success_count", 0),
             }
         )
 
-    return jsonify(
-        {
-            "priority_order": default_priority,
-            "providers": providers_info,
-        }
-    )
+    return jsonify({"priority_order": default_priority, "providers": providers_info})
 
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
-    """Execute API-first search with optional free SearXNG fallback.
+    """Execute API-first search with a bounded request budget.
 
-    POST accepts JSON:
-      - query (str, required): Search query
-      - pageno (int, optional): Page number, default 1
-      - time_range (str, optional): Time range filter
-      - date_after/date_before (str, optional): Exact ISO date boundaries
-      - safesearch (int, optional): Safe search level (0/1/2)
-      - max_results (int, optional): Results per page, default 10
-      - fallback_on_empty (bool, optional): Fallback on empty results, default false
-
-    GET accepts SearXNG-compatible q/format/count parameters, always tries every
-    configured API provider on empty results, then uses the configured free
-    SearXNG engines only if the API tier produced no results.
+    GET uses the gateway budget and reserves time for free SearXNG fallback.
+    POST is used by the SearXNG engine adapter and stays within its shorter timeout.
     """
-    state.init_db()
     if request.method == "GET":
         data = {
             "query": request.args.get("q", ""),
@@ -367,7 +433,22 @@ def search():
     if error:
         return jsonify({"error": error}), 400
 
-    api_result = _run_api_search(search_input)
+    total_timeout = (
+        config.API_POOL_ENGINE_TIMEOUT
+        if request.method == "POST"
+        else config.API_POOL_GATEWAY_TIMEOUT
+    )
+    deadline = time.monotonic() + max(0.1, total_timeout)
+    if request.method == "POST":
+        api_deadline = deadline
+    else:
+        reserve = min(
+            config.SEARXNG_FALLBACK_RESERVE,
+            max(0.1, total_timeout - 0.1),
+        )
+        api_deadline = deadline - reserve
+
+    api_result = _run_api_search(search_input, deadline=api_deadline)
     if api_result["results"] or request.method == "POST":
         if request.method == "GET":
             api_result["query"] = search_input["query"]
@@ -381,18 +462,20 @@ def search():
         api_result["fallback_used"] = False
         return jsonify(api_result)
 
-    return jsonify(_run_free_search(search_input, api_result["attempts"]))
+    return jsonify(
+        _run_free_search(search_input, api_result["attempts"], deadline=deadline)
+    )
 
 
 def main():
     """Entry point for running the Broker directly."""
+    _configure_logging()
     state.init_db()
-    # Initialize configured state for all providers
-    configured = config.get_configured_providers()
-    for prov, is_cfg in configured.items():
-        state.set_configured(prov, is_cfg)
 
-    # Recover misconfigured/unavailable providers to available on startup
+    configured = config.get_configured_providers()
+    for provider, is_configured in configured.items():
+        state.set_configured(provider, is_configured)
+
     state.recover_configured_providers()
 
     print(f"API Pool Broker starting on {config.BROKER_HOST}:{config.BROKER_PORT}")

@@ -1,29 +1,74 @@
-"""Base provider interface and shared utilities."""
+"""Base provider interface and shared HTTP connection pools."""
+
+import atexit
+import threading
+from contextlib import contextmanager
+from typing import Iterator, Optional
 
 import httpx
-from contextlib import contextmanager
-from typing import Optional, Iterator
 
 from .. import config
 
 
-@contextmanager
-def get_http_client() -> Iterator[httpx.Client]:
-    """Context manager: create an httpx Client and ensure it is closed after use.
+_CLIENT_LOCK = threading.Lock()
+_CLIENTS: dict[bool, httpx.Client] = {}
 
-    Uses httpx's built-in environment proxy support (trust_env=True)
-    so no explicit proxy URL is needed. The process env vars HTTP_PROXY,
-    HTTPS_PROXY, NO_PROXY are read automatically.
-    """
-    client = httpx.Client(
-        timeout=config.PROVIDER_REQUEST_TIMEOUT,
-        follow_redirects=True,
-        trust_env=True,
+
+def build_request_timeout(seconds: Optional[float]) -> Optional[httpx.Timeout]:
+    """Build a per-request timeout with bounded connect and pool waits."""
+    if seconds is None:
+        return None
+    bounded = max(0.05, float(seconds))
+    return httpx.Timeout(
+        bounded,
+        connect=min(config.PROVIDER_CONNECT_TIMEOUT, bounded),
+        pool=min(config.PROVIDER_POOL_TIMEOUT, bounded),
     )
-    try:
-        yield client
-    finally:
+
+
+def request_timeout_options(seconds: Optional[float]) -> dict:
+    timeout = build_request_timeout(seconds)
+    return {"timeout": timeout} if timeout is not None else {}
+
+
+def _create_client(trust_env: bool) -> httpx.Client:
+    return httpx.Client(
+        timeout=httpx.Timeout(
+            config.PROVIDER_REQUEST_TIMEOUT,
+            connect=config.PROVIDER_CONNECT_TIMEOUT,
+            pool=config.PROVIDER_POOL_TIMEOUT,
+        ),
+        follow_redirects=True,
+        trust_env=trust_env,
+        limits=httpx.Limits(
+            max_connections=config.HTTP_MAX_CONNECTIONS,
+            max_keepalive_connections=config.HTTP_MAX_KEEPALIVE_CONNECTIONS,
+            keepalive_expiry=config.HTTP_KEEPALIVE_EXPIRY,
+        ),
+    )
+
+
+@contextmanager
+def get_http_client(trust_env: bool = True) -> Iterator[httpx.Client]:
+    """Borrow a shared client; httpx.Client is thread-safe and reuses keep-alive connections."""
+    with _CLIENT_LOCK:
+        client = _CLIENTS.get(trust_env)
+        if client is None or client.is_closed:
+            client = _create_client(trust_env)
+            _CLIENTS[trust_env] = client
+    yield client
+
+
+def close_http_clients() -> None:
+    """Close shared clients during process shutdown or test teardown."""
+    with _CLIENT_LOCK:
+        clients = list(_CLIENTS.values())
+        _CLIENTS.clear()
+    for client in clients:
         client.close()
+
+
+atexit.register(close_http_clients)
 
 
 class ProviderResult:

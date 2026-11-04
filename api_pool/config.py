@@ -1,19 +1,23 @@
 """Public API Pool configuration.
 
 Loads optional API keys from process environment first, then from an env file.
-The default env file is ``<install-root>/config/api-pool.env`` and can be
-overridden with ``API_POOL_ENV_FILE``.
+The default env file is under the installation config directory and can be
+overridden with API_POOL_ENV_FILE.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import threading
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = ROOT_DIR / "config" / "api-pool.env"
 ENV_FILE = Path(os.environ.get("API_POOL_ENV_FILE", str(DEFAULT_ENV_FILE))).expanduser()
+_ENV_CACHE_LOCK = threading.Lock()
+_ENV_CACHE_KEY = None
+_ENV_CACHE_VALUES: dict[str, str] = {}
 
 _PROVIDER_KEY_ALIASES: dict[str, tuple[str, ...]] = {
     "brave": ("BRAVE_API_KEY",),
@@ -26,21 +30,36 @@ DEFAULT_PRIORITY = ["parallel", "tavily", "brave", "firecrawl"]
 
 
 def _load_env_file() -> dict[str, str]:
-    result: dict[str, str] = {}
-    if not ENV_FILE.is_file():
-        return result
-    for raw_line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line)
-        if not match:
-            continue
-        value = match.group(2).strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
-        result[match.group(1)] = value
-    return result
+    """Read the env file once and refresh when its file signature changes."""
+    global _ENV_CACHE_KEY, _ENV_CACHE_VALUES
+
+    try:
+        stat = ENV_FILE.stat()
+        cache_key = (str(ENV_FILE.resolve()), stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        cache_key = (str(ENV_FILE), None, None)
+
+    with _ENV_CACHE_LOCK:
+        if cache_key == _ENV_CACHE_KEY:
+            return dict(_ENV_CACHE_VALUES)
+
+        result: dict[str, str] = {}
+        if cache_key[1] is not None:
+            for raw_line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line)
+                if not match:
+                    continue
+                value = match.group(2).strip()
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                    value = value[1:-1]
+                result[match.group(1)] = value
+
+        _ENV_CACHE_KEY = cache_key
+        _ENV_CACHE_VALUES = result
+        return dict(result)
 
 
 def _get_api_key(provider: str) -> str | None:
@@ -101,7 +120,20 @@ BROKER_PORT = int(os.environ.get("API_POOL_PORT", "8890"))
 COOLDOWN_BASE_SECONDS = int(os.environ.get("API_POOL_COOLDOWN_SECONDS", "120"))
 QUOTA_PROBE_INTERVAL_SECONDS = int(os.environ.get("API_POOL_QUOTA_PROBE_SECONDS", "86400"))
 MAX_CONSECUTIVE_FAILURES = 5
+
 PROVIDER_REQUEST_TIMEOUT = float(os.environ.get("API_POOL_PROVIDER_TIMEOUT", "15"))
+PROVIDER_CONNECT_TIMEOUT = float(os.environ.get("API_POOL_CONNECT_TIMEOUT", "5"))
+PROVIDER_POOL_TIMEOUT = float(os.environ.get("API_POOL_POOL_TIMEOUT", "2"))
+HTTP_MAX_CONNECTIONS = int(os.environ.get("API_POOL_MAX_CONNECTIONS", "20"))
+HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.environ.get("API_POOL_MAX_KEEPALIVE_CONNECTIONS", "10"))
+HTTP_KEEPALIVE_EXPIRY = float(os.environ.get("API_POOL_KEEPALIVE_EXPIRY", "30"))
+
+# GET gateway calls reserve time for the free-engine fallback.
+API_POOL_GATEWAY_TIMEOUT = float(os.environ.get("API_POOL_GATEWAY_TIMEOUT", "27"))
+API_POOL_ENGINE_TIMEOUT = float(os.environ.get("API_POOL_ENGINE_TIMEOUT", "17"))
+SEARXNG_FALLBACK_RESERVE = float(os.environ.get("SEARXNG_FALLBACK_RESERVE", "10"))
+SEARXNG_FALLBACK_TIMEOUT = float(os.environ.get("SEARXNG_FALLBACK_TIMEOUT", "10"))
+BROKER_LOG_FILE = ROOT_DIR / "broker-run.err.log"
 
 SEARXNG_BACKEND_URL = os.environ.get(
     "SEARXNG_BACKEND_URL", "http://127.0.0.1:8888"
@@ -122,6 +154,3 @@ SEARXNG_FREE_ENGINES = _configured_free_engines or (
 SEARXNG_FREE_FALLBACK = os.environ.get(
     "SEARXNG_FREE_FALLBACK", "true"
 ).strip().lower() in ("1", "true", "yes", "on")
-SEARXNG_FALLBACK_TIMEOUT = float(
-    os.environ.get("SEARXNG_FALLBACK_TIMEOUT", "20")
-)

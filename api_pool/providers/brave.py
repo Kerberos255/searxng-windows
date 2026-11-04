@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .base import get_http_client, ProviderResult, make_result_item
+from .base import get_http_client, ProviderResult, make_result_item, request_timeout_options
 from .. import config
 
 
@@ -25,6 +25,7 @@ def search(
     date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
+    timeout: Optional[float] = None,
 ) -> ProviderResult:
     """Call Brave Search API and return results.
 
@@ -72,7 +73,8 @@ def search(
         with get_http_client() as client:
             url = f"{BASE_URL}?{urlencode(params)}"
             headers = {"X-Subscription-Token": api_key}
-            resp = client.get(url, headers=headers)
+            resp = client.get(url, headers=headers, **request_timeout_options(timeout))
+
         status = resp.status_code
 
         if status == 200:

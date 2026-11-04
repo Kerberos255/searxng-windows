@@ -15,6 +15,7 @@ $Log = Join-Path $Root "searxng-run.log"
 $ErrLog = Join-Path $Root "searxng-run.err.log"
 $BrokerLog = Join-Path $Root "broker-run.log"
 $BrokerErrLog = Join-Path $Root "broker-run.err.log"
+$BrokerConsoleErrLog = Join-Path $Root "broker-console.err.log"
 $Url = "http://127.0.0.1:8888/"
 $BrokerUrl = "http://127.0.0.1:8890/health"
 
@@ -52,7 +53,7 @@ if ($ApiPoolEnabled) {
 
     if (!$BrokerRunning) {
         Remove-Item -LiteralPath $BrokerLog -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $BrokerErrLog -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $BrokerConsoleErrLog -Force -ErrorAction SilentlyContinue
 
         $BrokerArgs = @(
             "-ExecutionPolicy", "Bypass",
@@ -70,7 +71,7 @@ if ($ApiPoolEnabled) {
             -WorkingDirectory $Root `
             -WindowStyle Hidden `
             -RedirectStandardOutput $BrokerLog `
-            -RedirectStandardError $BrokerErrLog `
+            -RedirectStandardError $BrokerConsoleErrLog `
             -PassThru
 
         Set-Content -LiteralPath $BrokerPidFile -Value $BrokerProcess.Id -Encoding ASCII

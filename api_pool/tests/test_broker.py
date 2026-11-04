@@ -689,15 +689,15 @@ class TestSearXNGCompatibleGateway(BrokerTestBase):
         self.assertEqual(resp.get_json()["provider"], "searxng_free")
         mock_free_search.assert_called_once()
 
-    @patch("api_pool.app.httpx.Client")
-    def test_free_tier_queries_all_default_engines(self, mock_client_class):
+    @patch("api_pool.app.get_http_client")
+    def test_free_tier_queries_all_default_engines(self, mock_get_client):
         response = MagicMock()
         response.json.return_value = {"results": []}
         client = MagicMock()
         client.get.return_value = response
         client_context = MagicMock()
         client_context.__enter__.return_value = client
-        mock_client_class.return_value = client_context
+        mock_get_client.return_value = client_context
 
         search_input = {
             "query": "hello",

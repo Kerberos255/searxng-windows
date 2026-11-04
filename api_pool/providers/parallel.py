@@ -9,7 +9,7 @@ from typing import Optional
 
 import httpx
 
-from .base import get_http_client, ProviderResult, make_result_item
+from .base import get_http_client, ProviderResult, make_result_item, request_timeout_options
 from .. import config
 
 BASE_URL = "https://api.parallel.ai/v1/search"
@@ -39,6 +39,7 @@ def search(
     date_before: Optional[str] = None,
     safesearch: Optional[int] = None,
     max_results: int = 10,
+    timeout: Optional[float] = None,
 ) -> ProviderResult:
     """Call Parallel Search API and return results.
 
@@ -100,7 +101,8 @@ def search(
     try:
         with get_http_client() as client:
             headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-            resp = client.post(BASE_URL, json=payload, headers=headers)
+            resp = client.post(BASE_URL, json=payload, headers=headers, **request_timeout_options(timeout))
+
         status = resp.status_code
 
         if status == 200:

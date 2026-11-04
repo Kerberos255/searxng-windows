@@ -45,6 +45,9 @@ try {
     }
 
     & powershell -ExecutionPolicy Bypass -File $InstallScript -Root $Root -RuntimePython $RuntimePython
+    if ($LASTEXITCODE -ne 0) {
+        throw "SearXNG installation failed with exit code $LASTEXITCODE."
+    }
 } finally {
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
