@@ -19,6 +19,46 @@ $BrokerConsoleErrLog = Join-Path $Root "broker-console.err.log"
 $Url = "http://127.0.0.1:8888/"
 $BrokerUrl = "http://127.0.0.1:8890/health"
 
+function Protect-LogFile {
+    param([string]$Path)
+    if (![System.IO.File]::Exists($Path)) { return }
+    try {
+        $Content = [System.IO.File]::ReadAllText($Path)
+        $Redacted = [System.Text.RegularExpressions.Regex]::Replace(
+            $Content,
+            '(?i)(?<path>(?:https?://|/)[^\s?"]+)\?[^\s"]*',
+            '$1?[REDACTED]'
+        )
+        if ($Redacted -ne $Content) {
+            [System.IO.File]::WriteAllText(
+                $Path,
+                $Redacted,
+                [System.Text.UTF8Encoding]::new($false)
+            )
+        }
+    } catch {
+        Write-Warning "Could not redact an existing log file: $Path"
+        throw
+    }
+}
+
+function Rotate-LogFile {
+    param(
+        [string]$Path,
+        [int]$BackupCount = 3
+    )
+    for ($Index = $BackupCount; $Index -ge 1; $Index--) {
+        $Source = if ($Index -eq 1) { $Path } else { "$Path.$($Index - 1)" }
+        $Destination = "$Path.$Index"
+        if ([System.IO.File]::Exists($Destination)) {
+            Remove-Item -LiteralPath $Destination -Force
+        }
+        if ([System.IO.File]::Exists($Source)) {
+            Move-Item -LiteralPath $Source -Destination $Destination -Force
+        }
+    }
+}
+
 if (!(Test-Path $ApiPoolHelper)) {
     Write-Host "API Pool helper not found: $ApiPoolHelper"
     exit 1
@@ -52,8 +92,13 @@ if ($ApiPoolEnabled) {
     }
 
     if (!$BrokerRunning) {
-        Remove-Item -LiteralPath $BrokerLog -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $BrokerConsoleErrLog -Force -ErrorAction SilentlyContinue
+        foreach ($Path in @($BrokerErrLog, "$BrokerErrLog.1", "$BrokerErrLog.2", "$BrokerErrLog.3")) {
+            Protect-LogFile -Path $Path
+        }
+        foreach ($Path in @($BrokerLog, $BrokerConsoleErrLog)) {
+            Protect-LogFile -Path $Path
+            Rotate-LogFile -Path $Path
+        }
 
         $BrokerArgs = @(
             "-ExecutionPolicy", "Bypass",
@@ -76,24 +121,30 @@ if ($ApiPoolEnabled) {
 
         Set-Content -LiteralPath $BrokerPidFile -Value $BrokerProcess.Id -Encoding ASCII
         $BrokerReady = $false
-        for ($Attempt = 1; $Attempt -le 15; $Attempt++) {
-            Start-Sleep -Seconds 2
+        $Deadline = [DateTime]::UtcNow.AddSeconds(30)
+        while ([DateTime]::UtcNow -lt $Deadline) {
+            if ($BrokerProcess.HasExited) {
+                Write-Host "API Pool Broker launcher exited during startup: $($BrokerProcess.ExitCode)"
+                break
+            }
             try {
-                $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 3
+                $r = Invoke-WebRequest -Uri $BrokerUrl -UseBasicParsing -TimeoutSec 1
                 if ($r.StatusCode -eq 200) {
                     $BrokerReady = $true
                     break
                 }
             } catch {
             }
+            Start-Sleep -Milliseconds 500
         }
 
         if ($BrokerReady) {
             Write-Host "API Pool Broker started: $BrokerUrl"
         } else {
-            Write-Host "API Pool Broker did not respond after 30 seconds. Check logs:"
+            Write-Host "API Pool Broker did not become healthy within 30 seconds. Check logs:"
             Write-Host $BrokerLog
             Write-Host $BrokerErrLog
+            Write-Host $BrokerConsoleErrLog
             exit 1
         }
     }
@@ -119,8 +170,11 @@ if (Test-Path $PidFile) {
     Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
 }
 
-Remove-Item -LiteralPath $Log -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $ErrLog -Force -ErrorAction SilentlyContinue
+foreach ($Path in @($Log, $ErrLog)) {
+    Protect-LogFile -Path $Path
+    foreach ($Index in @(1, 2, 3)) { Protect-LogFile -Path "$Path.$Index" }
+    Rotate-LogFile -Path $Path
+}
 
 $SearxngArgs = @("-ExecutionPolicy", "Bypass", "-File", $RunScript, "-Root", $Root)
 if ($ProxyUrl) {

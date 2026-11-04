@@ -46,7 +46,7 @@ Agent 调用。
 2. 双击 `install-searxng-windows.cmd`。
 3. 打开 `%USERPROFILE%\Apps\searxng-windows`，双击
    `start-searxng.cmd`。
-4. 可选：双击 `check-searxng.cmd` 检查服务状态并执行一次测试搜索。
+4. 可选：双击 `check-searxng.cmd` 检查服务健康状态，默认不请求外部搜索 API。
 5. 打开 `http://127.0.0.1:8888`。
 
 `scripts\` 下的 PowerShell 脚本仍可用于自动化和高级参数。
@@ -144,7 +144,7 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Apps\searxng-windows\
 ```text
 start-searxng.cmd   启动 SearXNG 和已启用的 API Pool
 stop-searxng.cmd    停止本地服务
-check-searxng.cmd   检查状态并执行测试搜索
+check-searxng.cmd   检查服务健康状态（默认不执行实际搜索）
 ```
 
 对应的命令行操作如下：
@@ -158,7 +158,7 @@ powershell -ExecutionPolicy Bypass -File "$Root\scripts\start.ps1"
 # 停止本地服务
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\stop.ps1"
 
-# 检查服务状态并执行一次测试搜索
+# 检查服务健康状态（如需实际搜索，增加 -LiveSearch 参数）
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\check.ps1"
 
 # 更新上游 SearXNG 源码和依赖

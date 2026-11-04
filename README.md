@@ -46,8 +46,8 @@ SearXNG-compatible search backend for tools and AI agents.
 2. Double-click `install-searxng-windows.cmd`.
 3. Open `%USERPROFILE%\Apps\searxng-windows` and double-click
    `start-searxng.cmd`.
-4. Optionally double-click `check-searxng.cmd` to verify the services and run a
-   test search.
+4. Optionally double-click `check-searxng.cmd` to verify service health.
+   This does not spend API provider credits.
 5. Open `http://127.0.0.1:8888`.
 
 The PowerShell scripts under `scripts\` remain available for automation and
@@ -152,7 +152,7 @@ For normal desktop use, double-click these files in the installation directory:
 ```text
 start-searxng.cmd   Start SearXNG and the optional API Pool
 stop-searxng.cmd    Stop the local services
-check-searxng.cmd   Check status and run a test search
+check-searxng.cmd   Check service health without issuing searches
 ```
 
 The command-line equivalents are:
@@ -166,7 +166,7 @@ powershell -ExecutionPolicy Bypass -File "$Root\scripts\start.ps1"
 # Stop local services
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\stop.ps1"
 
-# Check service status and perform a test search
+# Check service health (add -LiveSearch for a real upstream search)
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\check.ps1"
 
 # Update the downloaded upstream SearXNG source and dependencies

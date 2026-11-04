@@ -33,6 +33,12 @@ jobs:
             }
           }
 
+      - name: Verify stop-script no-op does not target unrelated processes
+        shell: powershell
+        run: |
+          $TestRoot = Join-Path $env:RUNNER_TEMP "not-a-searxng-install"
+          .\scripts\stop.ps1 -Root $TestRoot
+
       - name: Check Python syntax
         shell: pwsh
         run: |

@@ -175,6 +175,21 @@ class TestPublicPackageSafety(unittest.TestCase):
         self.assertIn("if ($ApiPoolEnabled)", check)
         self.assertIn("Broker checks skipped", check)
 
+    def test_stop_only_targets_verified_installation_processes(self):
+        stop = (REPO_ROOT / "scripts" / "stop.ps1").read_text(encoding="utf-8")
+        self.assertIn("Test-VerifiedProcess", stop)
+        self.assertIn("$ExpectedBrokerApp", stop)
+        self.assertIn("$VenvPrefix", stop)
+        self.assertIn("$Current.CreationDate -ne $Process.CreationDate", stop)
+        self.assertNotIn("Stop-Process -Id $Listener.OwningProcess", stop)
+        self.assertNotIn("Stop-Process -Id $LauncherPid", stop)
+
+    def test_health_check_does_not_spend_api_credits_by_default(self):
+        check = (REPO_ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
+        self.assertIn("[switch]$LiveSearch", check)
+        self.assertIn("if ($LiveSearch)", check)
+        self.assertIn("$ResultCount = if ($null -eq $Search.results)", check)
+
     def test_release_workflow_is_gated_by_validation(self):
         workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn('tags:', workflow)

@@ -1,7 +1,8 @@
 param(
     [string]$Root = "$env:USERPROFILE\Apps\searxng-windows",
     [string]$BrokerUrl = "http://127.0.0.1:8890",
-    [string]$SearxngUrl = "http://127.0.0.1:8888"
+    [string]$SearxngUrl = "http://127.0.0.1:8888",
+    [switch]$LiveSearch
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,14 +35,8 @@ if ($ApiPoolEnabled) {
         foreach ($Provider in $Status.providers) {
             Write-Host " - $($Provider.provider): configured=$($Provider.configured), status=$($Provider.status)"
         }
-
-        $BrokerQuery = [uri]::EscapeDataString("open source metasearch")
-        $BrokerSearch = Invoke-RestMethod -Uri "$BrokerUrl/search?q=$BrokerQuery&format=json&count=3" -Method Get -TimeoutSec 60
-        $BrokerResults = @($BrokerSearch.results).Count
-        Write-Host "API-first gateway works; provider=$($BrokerSearch.provider), fallback=$($BrokerSearch.fallback_used), results=$BrokerResults"
-        if ($BrokerResults -le 0) { $AllOk = $false }
     } catch {
-        Write-Host "Broker check failed:" $_
+        Write-Host "Broker health check failed:" $_
         $AllOk = $false
     }
 } else {
@@ -49,17 +44,36 @@ if ($ApiPoolEnabled) {
 }
 
 try {
-    $Encoded = [uri]::EscapeDataString("open source metasearch")
-    $Response = Invoke-RestMethod -Uri "$SearxngUrl/search?q=$Encoded&format=json&categories=general" -Method Get -TimeoutSec 30
-    $ResultCount = @($Response.results).Count
-    Write-Host "SearXNG results:" $ResultCount
-    if ($ResultCount -le 0) {
-        Write-Host "SearXNG responded but returned no free-web results."
+    $Response = Invoke-WebRequest -Uri "$SearxngUrl/" -UseBasicParsing -TimeoutSec 5
+    if ($Response.StatusCode -ne 200) {
+        Write-Host "SearXNG homepage returned HTTP $($Response.StatusCode)."
         $AllOk = $false
+    } else {
+        Write-Host "SearXNG homepage: HTTP 200"
     }
 } catch {
-    Write-Host "SearXNG check failed:" $_
+    Write-Host "SearXNG health check failed:" $_
     $AllOk = $false
+}
+
+if ($LiveSearch) {
+    try {
+        $Encoded = [uri]::EscapeDataString("open source metasearch")
+        if ($ApiPoolEnabled) {
+            $SearchUrl = "$BrokerUrl/search?q=$Encoded&format=json&count=3"
+        } else {
+            $SearchUrl = "$SearxngUrl/search?q=$Encoded&format=json&categories=general"
+        }
+        $Search = Invoke-RestMethod -Uri $SearchUrl -Method Get -TimeoutSec 30
+        $ResultCount = if ($null -eq $Search.results) { 0 } else { @($Search.results).Count }
+        Write-Host "Live search results:" $ResultCount "provider:" $Search.provider "fallback:" $Search.fallback_used
+        if ($ResultCount -le 0) { $AllOk = $false }
+    } catch {
+        Write-Host "Live search failed:" $_
+        $AllOk = $false
+    }
+} else {
+    Write-Host "Live search skipped. Use -LiveSearch to call upstream providers/search engines."
 }
 
 if ($AllOk) {
