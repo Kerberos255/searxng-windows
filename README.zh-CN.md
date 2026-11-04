@@ -57,9 +57,10 @@ Agent 调用。
 %USERPROFILE%\Apps\searxng-windows
 ```
 
-bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG、创建虚拟
-环境、安装依赖、生成本地 `secret_key`，并应用 Windows 补丁。已有的
-`config/settings.yml` 和 `config/api-pool.env` 会被保留。
+bootstrap 安装器默认解析并下载最新 Release，再下载上游 SearXNG。源码 ZIP
+解压时会跳过 Windows 无法创建的 Unix 模板文件名，并在确认 `setup.py`、
+`requirements.txt` 和 `searx/webapp.py` 完整后才继续创建虚拟环境、安装依赖、
+生成本地 `secret_key` 并应用 Windows 补丁。已有的 `config/settings.yml` 和 `config/api-pool.env` 会被保留。
 
 ## 客户端接入
 
@@ -167,8 +168,10 @@ powershell -ExecutionPolicy Bypass -File "$Root\scripts\update.ps1"
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\register-startup-task.ps1" -Root $Root
 ```
 
-`update.ps1` 只更新上游 SearXNG。要更新本仓库的 Windows 脚本、API Pool 和配置
-模板，请重新运行最新 Release 中的安装器；已有本地配置会被保留。
+`update.ps1` 会下载并验证最新的上游 SearXNG 源码 ZIP，跳过 Windows 无法创建的
+文件名；只有解压和完整性检查成功后才替换源码，并保留带时间戳的旧源码备份。
+要更新本仓库的 Windows 脚本、API Pool 和配置模板，请重新运行最新 Release 中的
+安装器；已有本地配置会被保留。
 
 ## 从 Git 仓库安装
 

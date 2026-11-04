@@ -17,8 +17,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check PowerShell syntax
-        shell: pwsh
+      - name: Check Windows PowerShell 5.1 syntax
+        shell: powershell
         run: |
           $scripts = @(
             Get-Item -Path install-searxng-windows.ps1
@@ -40,6 +40,7 @@ jobs:
             "skill/scripts/search.py"
             "skill/scripts/searxng.py"
             "patches/api_pool.py"
+            "scripts/extract-source.py"
           )
           $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
           python -m py_compile @pythonFiles

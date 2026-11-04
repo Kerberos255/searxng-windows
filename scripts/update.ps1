@@ -8,17 +8,17 @@ $Repo = Join-Path $Root "searxng"
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
 $Zip = Join-Path $Root "searxng-master.zip"
 $DownloadZip = Join-Path $Root "searxng-master-new.zip"
-$Extract = Join-Path $Root "_extract"
-$Backup = Join-Path $Root ("searxng.backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$SourceExtractor = Join-Path $ScriptRoot "extract-source.py"
+$Backup = Join-Path $Root ("searxng.backup-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
 
-if (!(Test-Path $Repo)) {
-    Write-Host "SearXNG source not found: $Repo"
+if (!(Test-Path -LiteralPath $Python -PathType Leaf)) {
+    Write-Host "Python venv not found: $Python"
     exit 1
 }
 
-if (!(Test-Path $Python)) {
-    Write-Host "Python venv not found: $Python"
+if (![System.IO.File]::Exists($SourceExtractor)) {
+    Write-Host "SearXNG ZIP extractor not found: $SourceExtractor"
     exit 1
 }
 
@@ -27,55 +27,121 @@ try {
     $r = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 3
     if ($r.StatusCode -eq 200) {
         $WasRunning = $true
-        Write-Host "SearXNG is running, stopping before update..."
-        & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "stop.ps1") -Root $Root
-        Start-Sleep -Seconds 2
     }
 } catch {
 }
 
-Set-Location $Repo
-
-if (Test-Path (Join-Path $Repo ".git")) {
-    Write-Host "Current version:"
-    git rev-parse --short HEAD
-    git fetch origin
-    git checkout master
-    git pull --ff-only origin master
-} else {
-    Write-Host "Zip-based install detected, downloading latest source archive..."
-    Invoke-WebRequest -Uri "https://github.com/searxng/searxng/archive/refs/heads/master.zip" -OutFile $DownloadZip
-    Remove-Item -LiteralPath $Extract -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Path $Extract | Out-Null
-    tar -xf $DownloadZip -C $Extract
-    Move-Item -LiteralPath $Repo -Destination $Backup
-    Move-Item -LiteralPath (Join-Path $Extract "searxng-master") -Destination $Repo
-    Remove-Item -LiteralPath $Extract -Recurse -Force
-    Move-Item -LiteralPath $DownloadZip -Destination $Zip -Force
-    Write-Host "Previous source moved to: $Backup"
-}
-
-& powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "apply-windows-patch.ps1") -Root $Root
-
-Set-Location $Repo
-& $Python -m pip install -U pip setuptools wheel
-& $Python -m pip install -r requirements.txt
-$ApiPoolRequirements = Join-Path $Root "api_pool\requirements.txt"
-if (Test-Path $ApiPoolRequirements) {
-    & $Python -m pip install -r $ApiPoolRequirements
-}
-& $Python -m pip install -e .
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Editable install failed with build isolation; retrying without build isolation."
-    & $Python -m pip install --no-build-isolation -e .
+if ($WasRunning) {
+    Write-Host "SearXNG is running, stopping before update..."
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "stop.ps1") -Root $Root
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Editable install failed."
-        exit $LASTEXITCODE
+        throw "Failed to stop SearXNG before updating."
+    }
+    Start-Sleep -Seconds 2
+}
+
+$Staging = Join-Path $Root ("_searxng-update-" + [guid]::NewGuid().ToString("N"))
+$UpdateSucceeded = $false
+$SourceMovedToBackup = $false
+
+try {
+    New-Item -ItemType Directory -Force -Path $Staging | Out-Null
+    Write-Host "Downloading the upstream SearXNG source archive..."
+    Invoke-WebRequest -Uri "https://github.com/searxng/searxng/archive/refs/heads/master.zip" -OutFile $DownloadZip -UseBasicParsing
+
+    & $Python $SourceExtractor $DownloadZip $Staging
+    if ($LASTEXITCODE -ne 0) {
+        throw "SearXNG source extraction failed with exit code $LASTEXITCODE."
+    }
+
+    if (![System.IO.File]::Exists((Join-Path $Staging "setup.py")) -or
+        ![System.IO.File]::Exists((Join-Path $Staging "requirements.txt")) -or
+        ![System.IO.File]::Exists((Join-Path $Staging "searx\webapp.py"))) {
+        throw "The extracted SearXNG source is incomplete."
+    }
+
+    if ([System.IO.Directory]::Exists($Repo)) {
+        Move-Item -LiteralPath $Repo -Destination $Backup
+        $SourceMovedToBackup = $true
+    }
+
+    try {
+        Move-Item -LiteralPath $Staging -Destination $Repo
+
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "apply-windows-patch.ps1") -Root $Root
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to apply the Windows compatibility patch."
+        }
+
+        Push-Location $Repo
+        try {
+            & $Python -m pip install -U pip setuptools wheel
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to upgrade pip, setuptools, and wheel."
+            }
+
+            & $Python -m pip install -r requirements.txt
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to install SearXNG requirements."
+            }
+
+            $ApiPoolRequirements = Join-Path $Root "api_pool\requirements.txt"
+            if (Test-Path -LiteralPath $ApiPoolRequirements -PathType Leaf) {
+                & $Python -m pip install -r $ApiPoolRequirements
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to install API Pool requirements."
+                }
+            }
+
+            & $Python -m pip install -e .
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Editable install failed with build isolation; retrying without build isolation."
+                & $Python -m pip install --no-build-isolation -e .
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Editable install failed with exit code $LASTEXITCODE."
+                }
+            }
+        } finally {
+            Pop-Location
+        }
+
+        Move-Item -LiteralPath $DownloadZip -Destination $Zip -Force
+        $UpdateSucceeded = $true
+        if ($SourceMovedToBackup) {
+            Write-Host "Previous source backup: $Backup"
+        }
+        Write-Host "Update finished."
+    } catch {
+        if ([System.IO.Directory]::Exists($Repo)) {
+            Remove-Item -LiteralPath $Repo -Recurse -Force
+        }
+        if ($SourceMovedToBackup -and [System.IO.Directory]::Exists($Backup)) {
+            Move-Item -LiteralPath $Backup -Destination $Repo
+            Write-Host "Restored the previous SearXNG source after the update failed."
+        }
+        throw
+    }
+} catch {
+    if ($WasRunning -and [System.IO.Directory]::Exists($Repo)) {
+        Write-Host "Update failed; attempting to restart the previous SearXNG service..."
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "start.ps1") -Root $Root
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Automatic restart failed. Check the SearXNG logs."
+        }
+    }
+    throw
+} finally {
+    if ([System.IO.Directory]::Exists($Staging)) {
+        Remove-Item -LiteralPath $Staging -Recurse -Force
+    }
+    if (!$UpdateSucceeded -and [System.IO.File]::Exists($DownloadZip)) {
+        Remove-Item -LiteralPath $DownloadZip -Force
     }
 }
 
-Write-Host "Update finished."
-
 if ($WasRunning) {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptRoot "start.ps1") -Root $Root
+    if ($LASTEXITCODE -ne 0) {
+        throw "Update succeeded, but SearXNG did not restart successfully."
+    }
 }

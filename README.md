@@ -36,7 +36,7 @@ SearXNG-compatible search backend for tools and AI agents.
 - Windows 10 or Windows 11
 - Python 3.11 or 3.12 x64
 - Internet access during installation
-- Git is optional; the installer falls back to source ZIP downloads
+- Git is not required; the installer downloads the upstream source ZIP and skips filenames that Windows cannot create
 
 ## Quick Start
 
@@ -60,9 +60,10 @@ The default installation directory is:
 ```
 
 The bootstrap installer resolves the latest Release by default, downloads that
-package and upstream SearXNG, creates a virtual environment, installs
-dependencies, generates a local `secret_key`, and applies the Windows patches.
-Existing `config/settings.yml` and `config/api-pool.env` files are preserved.
+package and upstream SearXNG, safely extracts the source ZIP while skipping
+Windows-incompatible Unix template filenames, creates a virtual environment,
+installs dependencies, generates a local `secret_key`, and applies the Windows
+patches. Existing `config/settings.yml` and `config/api-pool.env` files are preserved.
 
 ## Client Integration
 
@@ -175,9 +176,11 @@ powershell -ExecutionPolicy Bypass -File "$Root\scripts\update.ps1"
 powershell -ExecutionPolicy Bypass -File "$Root\scripts\register-startup-task.ps1" -Root $Root
 ```
 
-`update.ps1` updates upstream SearXNG. To update this repository's Windows
-scripts, API Pool code, and templates, rerun the installer files from the latest
-Release; existing local configuration is retained.
+`update.ps1` downloads and validates a fresh upstream SearXNG source ZIP, skips
+Windows-incompatible filenames, and replaces the source only after extraction
+succeeds. The previous source is retained as a timestamped backup. To update this
+repository's Windows scripts, API Pool code, and templates, rerun the installer
+files from the latest Release; existing local configuration is retained.
 
 ## Advanced Installation from a Git Clone
 

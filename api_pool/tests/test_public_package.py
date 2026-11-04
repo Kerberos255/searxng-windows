@@ -136,6 +136,35 @@ class TestPublicPackageSafety(unittest.TestCase):
         )
         self.assertIn('method: "GET"', deployment)
 
+    def test_installer_and_updater_use_windows_safe_source_archives(self):
+        installer = (REPO_ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8")
+        updater = (REPO_ROOT / "scripts" / "update.ps1").read_text(encoding="utf-8")
+        extractor = REPO_ROOT / "scripts" / "extract-source.py"
+
+        self.assertTrue(extractor.is_file())
+        self.assertIn("extract-source.py", installer)
+        self.assertIn("extract-source.py", updater)
+        self.assertIn('Join-Path $Repo "setup.py"', installer)
+        self.assertIn('Join-Path $Repo "requirements.txt"', installer)
+        self.assertIn('Join-Path $Repo "searx\\webapp.py"', installer)
+        self.assertIn('throw "The extracted SearXNG source is incomplete."', installer)
+        self.assertIn('Join-Path $Staging "setup.py"', updater)
+        self.assertIn('Join-Path $Staging "requirements.txt"', updater)
+        self.assertIn('Join-Path $Staging "searx\\webapp.py"', updater)
+        self.assertIn('throw "The extracted SearXNG source is incomplete."', updater)
+        self.assertIn('throw "The extracted SearXNG source is incomplete."', installer)
+        self.assertIn("Move-Item -LiteralPath $Repo -Destination $Backup", updater)
+        self.assertNotIn("git clone", installer.lower())
+        self.assertNotIn("git pull", updater.lower())
+        self.assertNotIn("git checkout", updater.lower())
+        self.assertNotIn("git fetch", updater.lower())
+
+    def test_health_check_uses_literal_windows_path_lookup(self):
+        check = (REPO_ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
+        self.assertIn("[System.IO.Path]::GetFullPath($Root)", check)
+        self.assertIn("[System.IO.File]::Exists($ApiPoolHelper)", check)
+        self.assertNotIn("Test-Path $ApiPoolHelper", check)
+
     def test_lifecycle_scripts_treat_api_pool_as_opt_in(self):
         start = (REPO_ROOT / "scripts" / "start.ps1").read_text(encoding="utf-8")
         check = (REPO_ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
@@ -153,6 +182,8 @@ class TestPublicPackageSafety(unittest.TestCase):
         self.assertIn("contents: write", workflow)
         self.assertIn("needs: validate", workflow)
         self.assertIn("merge-base --is-ancestor", workflow)
+        self.assertIn("Check Windows PowerShell 5.1 syntax", workflow)
+        self.assertIn("shell: powershell", workflow)
         self.assertIn("build-release.ps1", workflow)
 
         builder = (REPO_ROOT / "scripts" / "build-release.ps1").read_text(encoding="utf-8")
