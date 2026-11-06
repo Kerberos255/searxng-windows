@@ -96,14 +96,14 @@ try {
         try {
             [IO.File]::WriteAllText($PatchPath, "Write-Host 'Injected smoke-only update failure'; exit 29")
             [IO.File]::WriteAllText($UpdatePath, $TestUpdate)
-            $OldPreference = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            try {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $UpdatePath -Root $InstallRoot 1>$null 2>$null
-                $FailureExit = $LASTEXITCODE
-            } finally {
-                $ErrorActionPreference = $OldPreference
+            # Launch independently so child services cannot keep CI's stdout pipe open.
+            $UpdateArguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $UpdatePath + '" -Root "' + $InstallRoot + '"'
+            $UpdateJob = Start-Process -FilePath "powershell.exe" -ArgumentList $UpdateArguments -WindowStyle Hidden -PassThru
+            if (!$UpdateJob.WaitForExit(180000)) {
+                Stop-Process -Id $UpdateJob.Id -Force -ErrorAction SilentlyContinue
+                throw "Injected update timed out instead of completing rollback."
             }
+            $FailureExit = $UpdateJob.ExitCode
         } finally {
             [IO.File]::WriteAllText($PatchPath, $PatchContent, (New-Object Text.UTF8Encoding($false)))
             [IO.File]::WriteAllText($UpdatePath, $UpdateContent, (New-Object Text.UTF8Encoding($false)))
