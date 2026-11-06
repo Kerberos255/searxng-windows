@@ -74,3 +74,6 @@ param([string]$Root)
         Remove-Item -LiteralPath $Fixture -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
+
+# Expected negative-case launcher exits must not fail the enclosing CI step.
+$global:LASTEXITCODE = 0
