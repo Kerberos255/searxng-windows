@@ -72,8 +72,25 @@ jobs:
           python -m pip install -r api_pool/requirements.txt
           python -m unittest discover -s api_pool/tests -v
 
-  publish:
+  windows-bootstrap-smoke:
     needs: validate
+    runs-on: windows-2025
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify GitHub-downloaded installers, both services and failed-update rollback
+        shell: powershell
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\tests\windows-bootstrap-smoke.ps1 -Ref $env:CANDIDATE_SHA -RuntimePython (Get-Command python).Source -Extended
+
+  publish:
+    needs: [validate, windows-bootstrap-smoke]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
