@@ -87,3 +87,15 @@ if (!(Test-Path $ApiPoolTarget)) {
 }
 
 Write-Host "API Pool SearXNG engine installed."
+
+# Keep engines without native time-range support searchable without a date filter.
+$TimeRangePatchScript = Join-Path $ScriptRoot "patch_time_range_engines.py"
+$VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
+if (!(Test-Path -LiteralPath $TimeRangePatchScript -PathType Leaf) -or
+    !(Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
+    throw "Date fallback patch prerequisites are missing."
+}
+& $VenvPython $TimeRangePatchScript $Root
+if ($LASTEXITCODE -ne 0) {
+    throw "Date fallback patch failed."
+}

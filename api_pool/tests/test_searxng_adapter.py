@@ -80,6 +80,11 @@ class TestSearXNGAdapter(unittest.TestCase):
         self.assertEqual(parsed.utcoffset().total_seconds(), 0)
         self.assertEqual(parsed.hour, 12)
 
+    def test_http_date_is_normalized(self):
+        parsed = self.engine._parse_published_date("Tue, 03 Nov 2026 17:15:00 GMT")
+        self.assertEqual((parsed.year, parsed.month, parsed.day), (2026, 11, 3))
+        self.assertEqual(parsed.utcoffset().total_seconds(), 0)
+
     def test_invalid_date_is_omitted(self):
         self.assertIsNone(self.engine._parse_published_date("not-a-date"))
         self.assertIsNone(self.engine._parse_published_date(None))

@@ -63,6 +63,9 @@ def search(
         payload["end_date"] = date_before
     if time_range and not date_after and not date_before:
         payload["time_range"] = time_range
+    if time_range or date_after or date_before:
+        # Keep undated results while asking for publication metadata when possible.
+        payload["include_published_date"] = True
     if safesearch:
         payload["safe_search"] = True
 

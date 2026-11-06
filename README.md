@@ -119,7 +119,12 @@ consume all configured quotas. Empty results continue to the next API provider.
 Only when the complete API tier is unavailable or empty does the gateway query
 the free Bing, Sogou, Qwant, and Mojeek engines through SearXNG on port `8888`.
 When the API Pool is disabled, clients should remain on port `8888` and use
-ordinary SearXNG directly. Exact filters use `date_after` and `date_before` in
+ordinary SearXNG directly. Relative `time_range=day|week|month|year` filters are
+best-effort: engines with native support receive the restriction, while unsupported
+engines continue searching without it. Returned pages may therefore be older or
+have no known publication date. Date-limited Tavily searches request publication
+metadata when available, without automatically discarding undated sources.
+For time-sensitive research, verify dates in the original pages. Exact filters use `date_after` and `date_before` in
 `YYYY-MM-DD` format. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
 state, and fallback details.
 

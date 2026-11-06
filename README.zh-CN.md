@@ -111,7 +111,11 @@ Parallel → Tavily → Brave → Firecrawl → Bing/Sogou/Qwant/Mojeek 免费�
 第一家 API 返回有效结果后立即停止，不会让一次搜索同时消耗所有 API 的额度；
 空结果会继续尝试下一家。只有全部 API 都不可用或都没有结果时，网关才会调用
 `8888` 上的 Bing、Sogou、Qwant、Mojeek 免费层。API Pool 未启用时，客户端应
-继续连接 `8888`，直接使用普通 SearXNG。精确日期筛选使用 `date_after`、
+继续连接 `8888`，直接使用普通 SearXNG。相对时间筛选使用
+`time_range=day|week|month|year`：支持原生日期条件的引擎按范围过滤，
+不支持的引擎仍正常搜索（不带日期条件）；结果可能包含旧网页或缺少
+发布日期。带日期条件的 Tavily 搜索会尽量返回发布日期，但不会丢弃日期未知
+的结果；时效性重要的内容应核对原始网页日期。精确日期筛选使用 `date_after`、
 `date_before` 和 `YYYY-MM-DD` 格式。接口、状态机和故障切换说明见
 [`api_pool/README.md`](api_pool/README.md)。
 

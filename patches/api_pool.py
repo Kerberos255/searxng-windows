@@ -6,6 +6,7 @@ with automatic failover and quota tracking.
 """
 
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Optional
 
 from searx.result_types import EngineResults
@@ -57,7 +58,7 @@ def request(query: str, params) -> None:
 
 
 def _parse_published_date(value):
-    """Convert Broker ISO date strings to the datetime SearXNG expects."""
+    """Convert ISO or RFC 2822 dates to SearXNG-compatible datetimes."""
     if not isinstance(value, str) or not value.strip():
         return None
     normalized = value.strip()
@@ -66,11 +67,13 @@ def _parse_published_date(value):
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError:
-        return None
+        try:
+            parsed = parsedate_to_datetime(normalized)
+        except (TypeError, ValueError, IndexError):
+            return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed
-
 
 def response(resp) -> EngineResults:
     """Process Broker JSON response and return results."""
