@@ -22,7 +22,8 @@ jobs:
         run: |
           $scripts = @(
             Get-Item -Path install-searxng-windows.ps1
-            Get-ChildItem -Path scripts -Filter *.ps1            Get-ChildItem -Path tests -Filter *.ps1
+            Get-ChildItem -Path scripts -Filter *.ps1
+            Get-ChildItem -Path tests -Filter *.ps1
 
           )
           foreach ($script in $scripts) {

@@ -95,7 +95,7 @@ jobs:
       - name: Create GitHub Release
         shell: pwsh
         env:
-          GH_TOKEN: [REDACTED]{{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           $Assets = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
           gh release create $env:GITHUB_REF_NAME $Assets `
