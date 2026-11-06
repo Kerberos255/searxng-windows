@@ -85,18 +85,28 @@ try {
         $OriginalWebapp = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $InstallRoot "searxng\searx\webapp.py")
         $PatchPath = Join-Path $InstallRoot "scripts\apply-windows-patch.ps1"
         $PatchContent = [IO.File]::ReadAllText($PatchPath)
+        $UpdatePath = Join-Path $InstallRoot "scripts\update.ps1"
+        $UpdateContent = [IO.File]::ReadAllText($UpdatePath)
+        $ArchivePath = Join-Path $InstallRoot "searxng-master.zip"
+        if (![IO.File]::Exists($ArchivePath)) { throw "Cached upstream source archive not found." }
+        $DownloadCommand = 'Invoke-WebRequest -Uri "https://github.com/searxng/searxng/archive/refs/heads/master.zip" -OutFile $DownloadZip -UseBasicParsing'
+        $LocalCommand = 'Copy-Item -LiteralPath (Join-Path $Root "searxng-master.zip") -Destination $DownloadZip -Force'
+        if (!$UpdateContent.Contains($DownloadCommand)) { throw "Update script download command changed." }
+        $TestUpdate = $UpdateContent.Replace($DownloadCommand, $LocalCommand)
         try {
             [IO.File]::WriteAllText($PatchPath, "Write-Host 'Injected smoke-only update failure'; exit 29")
+            [IO.File]::WriteAllText($UpdatePath, $TestUpdate)
             $OldPreference = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
             try {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $InstallRoot "scripts\update.ps1") -Root $InstallRoot 2>&1 | Out-String | Out-Null
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $UpdatePath -Root $InstallRoot 1>$null 2>$null
                 $FailureExit = $LASTEXITCODE
             } finally {
                 $ErrorActionPreference = $OldPreference
             }
         } finally {
             [IO.File]::WriteAllText($PatchPath, $PatchContent, (New-Object Text.UTF8Encoding($false)))
+            [IO.File]::WriteAllText($UpdatePath, $UpdateContent, (New-Object Text.UTF8Encoding($false)))
         }
         if ($FailureExit -eq 0) { throw "Injected update failure unexpectedly succeeded." }
         $AfterWebapp = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $InstallRoot "searxng\searx\webapp.py")
