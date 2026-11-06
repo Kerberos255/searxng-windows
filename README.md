@@ -96,9 +96,9 @@ To enable it:
 
 ```dotenv
 BRAVE_API_KEY=
-[REDACTED]
+FIRECRAWL_API_KEY=
 TAVILY_API_KEY=
-[REDACTED]
+PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 

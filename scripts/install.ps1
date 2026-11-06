@@ -55,7 +55,7 @@ $SettingsPath = Join-Path $Root "config\settings.yml"
 $SettingsExample = Join-Path $RepoRoot "config\settings.example.yml"
 if (!(Test-Path -LiteralPath $SettingsPath) -and (Test-Path -LiteralPath $SettingsExample)) {
     Copy-Item -LiteralPath $SettingsExample -Destination $SettingsPath
-    $Secret = [REDACTED] $RuntimePythonResolved -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
+    $Secret = (& $RuntimePythonResolved -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
     if ($LASTEXITCODE -ne 0 -or !$Secret) {
         throw "Failed to generate the local SearXNG secret_key."
     }
