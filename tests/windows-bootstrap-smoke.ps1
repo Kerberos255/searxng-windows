@@ -67,7 +67,7 @@ try {
         $SettingsPath = Join-Path $InstallRoot "config\settings.yml"
         $Pattern = '(?m)(- name: api pool\s*\r?\n\s*engine: api_pool\s*\r?\n\s*disabled:\s*)true'
         if ([regex]::Matches($Settings, $Pattern).Count -ne 1) { throw "Expected exactly one disabled API Pool engine." }
-        $EnabledSettings = [regex]::Replace($Settings, $Pattern, '1false')
+        $EnabledSettings = [regex]::Replace($Settings, $Pattern, '$' + '{1}false')
         [IO.File]::WriteAllText($SettingsPath, $EnabledSettings, (New-Object Text.UTF8Encoding($false)))
         Invoke-Launcher "start-searxng.cmd"
         Invoke-Launcher "check-searxng.cmd"
