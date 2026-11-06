@@ -106,7 +106,18 @@ jobs:
             if ([IO.File]::ReadAllText($Settings) -cne $SavedSettings) {
               throw "Reinstall modified user settings."
             }
-            Write-Host "PASS Windows install, launch, health, stop, config-preserving reinstall."
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\update.ps1") -Root $Root
+            if ($LASTEXITCODE -ne 0) { throw "Upstream update failed: $LASTEXITCODE" }
+            if ([IO.File]::ReadAllText($Settings) -cne $SavedSettings) {
+              throw "Upstream update modified user settings."
+            }
+            & (Join-Path $Root "start-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Post-update startup failed: $LASTEXITCODE" }
+            & (Join-Path $Root "check-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Post-update health check failed: $LASTEXITCODE" }
+            & (Join-Path $Root "stop-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Post-update stop failed: $LASTEXITCODE" }
+            Write-Host "PASS full Windows install, launch, health, stop, reinstall, update, config preservation and post-update restart."
           } finally {
             if (Test-Path -LiteralPath (Join-Path $Root "scripts\stop.ps1")) {
               & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\stop.ps1") -Root $Root

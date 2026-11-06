@@ -55,7 +55,7 @@ $SettingsPath = Join-Path $Root "config\settings.yml"
 $SettingsExample = Join-Path $RepoRoot "config\settings.example.yml"
 if (!(Test-Path -LiteralPath $SettingsPath) -and (Test-Path -LiteralPath $SettingsExample)) {
     Copy-Item -LiteralPath $SettingsExample -Destination $SettingsPath
-    $Secret = (& $RuntimePythonResolved -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
+    $Secret = [REDACTED] $RuntimePythonResolved -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
     if ($LASTEXITCODE -ne 0 -or !$Secret) {
         throw "Failed to generate the local SearXNG secret_key."
     }
@@ -132,13 +132,10 @@ try {
         }
     }
 
-    & $Python -m pip install -e .
+    # Upstream packaging imports runtime dependencies already installed above.
+    & $Python -m pip install --no-build-isolation -e .
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Editable install failed with build isolation; retrying without build isolation."
-        & $Python -m pip install --no-build-isolation -e .
-        if ($LASTEXITCODE -ne 0) {
-            throw "Editable install failed with exit code $LASTEXITCODE."
-        }
+        throw "Editable install failed with exit code $LASTEXITCODE."
     }
 } finally {
     Pop-Location
