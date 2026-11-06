@@ -49,6 +49,13 @@ function Join-NativeArguments {
     return (($Values | ForEach-Object { Quote-NativeArgument $_ }) -join ' ')
 }
 
+# Windows PowerShell 5.1 cannot reliably redirect Start-Process logs when
+# the installation path includes wildcard brackets. Fail clearly before launch.
+if ($Root.Contains('[') -or $Root.Contains(']')) {
+    Write-Host "Unsupported installation directory: square brackets [ ] are not supported by the Windows PowerShell 5.1 launcher. Please choose a folder without brackets."
+    exit 1
+}
+
 $RunScript = Join-Path $Root "scripts\run.ps1"
 $BrokerRunScript = Join-Path $Root "scripts\run_broker.ps1"
 $ApiPoolHelper = Join-Path $Root "scripts\api-pool.ps1"
