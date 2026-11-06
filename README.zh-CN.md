@@ -36,7 +36,8 @@ Agent 调用。
 - Windows 10 或 Windows 11
 - Python 3.11 或 3.12 x64
 - 安装时可以访问互联网
-- Git 可选；没有 Git 时安装器会改用源码 ZIP
+- 不需要 Git；安装器直接下载上游源码 ZIP，并跳过 Windows 无法创建的文件名
+- GitHub CI 实测覆盖 Windows Server 2022/2025 × Python 3.11/3.12；Windows 10/11 桌面环境仍可能存在差异
 
 ## 快速安装
 
@@ -88,7 +89,8 @@ SearXNG 搜索引擎照常工作。
 
 1. 编辑 `%USERPROFILE%\Apps\searxng-windows\config\settings.yml`。
 2. 把 `api pool` 条目的 `disabled: true` 改为 `disabled: false`。
-3. 在 `config\api-pool.env` 中至少填写一个 Key：
+3. 按需在 `config\api-pool.env` 中填写 API Key。安装器会生成带空白占位符的配置文件；
+   **不填写 Key 也能使用免费 SearXNG 搜索回退**：
 
 ```dotenv
 BRAVE_API_KEY=
@@ -110,14 +112,16 @@ Parallel → Tavily → Brave → Firecrawl → Bing/Sogou/Qwant/Mojeek 免费�
 
 第一家 API 返回有效结果后立即停止，不会让一次搜索同时消耗所有 API 的额度；
 空结果会继续尝试下一家。只有全部 API 都不可用或都没有结果时，网关才会调用
-`8888` 上的 Bing、Sogou、Qwant、Mojeek 免费层。API Pool 未启用时，客户端应
-继续连接 `8888`，直接使用普通 SearXNG。相对时间筛选使用
-`time_range=day|week|month|year`：支持原生日期条件的引擎按范围过滤，
-不支持的引擎仍正常搜索（不带日期条件）；结果可能包含旧网页或缺少
-发布日期。带日期条件的 Tavily 搜索会尽量返回发布日期，但不会丢弃日期未知
-的结果；时效性重要的内容应核对原始网页日期。精确日期筛选使用 `date_after`、
-`date_before` 和 `YYYY-MM-DD` 格式。接口、状态机和故障切换说明见
-[`api_pool/README.md`](api_pool/README.md)。
+`8888` 上的 Bing、Sogou、Qwant、Mojeek 免费层。即使没有配置付费 API Key，
+只要本地免费搜索后端可用，Broker 仍能走免费回退。API Pool 未启用时，
+客户端应继续连接 `8888`，直接使用普通 SearXNG。
+
+相对时间筛选支持 `time_range=day|week|month|year`，属于尽力过滤：支持原生
+日期条件的引擎按范围搜索，不支持的引擎仍继续搜索（不带日期条件）。
+结果可能包含旧网页或缺少发布日期。带日期条件的 Tavily 搜索会尽量返回
+发布日期，但不会直接丢弃日期未知的结果。精确日期筛选使用 `date_after`、
+`date_before`，格式为 `YYYY-MM-DD`。对于时效性重要的内容，应核对原网页日期。
+接口、状态机和故障切换细节见 [`api_pool/README.md`](api_pool/README.md)。
 
 ## 代理配置
 
@@ -187,18 +191,33 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERP
 
 当 `config/settings.yml` 不存在时，安装脚本会自动创建它并生成本地 secret；不需
 手工生成。系统 PATH 中没有 `python` 时，可用 `-RuntimePython` 指定完整路径。
-需要固定某个版本时，bootstrap 安装器支持传入 `-Ref v0.2.0`。
+需要固定某个版本时，bootstrap 安装器支持传入 `-Ref v0.2.7`。
 
 ## 故障排查
 
-先运行 `scripts\check.ps1`。安装目录中的常用日志：
+**安装完成本身不会生成运行日志。** 首次安装后，先双击 `start-searxng.cmd`。
+若启动在创建后台进程前就失败（如安装路径无效、辅助脚本缺失），
+日志文件**可能根本不存在**；此时应先查看并保存 CMD 窗口显示的完整错误，
+不要把「没有日志」误认为另一项故障。
+
+成功进入后台启动阶段后，日志会写入**安装根目录**（默认
+`%USERPROFILE%\Apps\searxng-windows`）：
 
 ```text
-searxng-run.log
-searxng-run.err.log
-broker-run.log
-broker-run.err.log
+searxng-run.log          SearXNG 启动器标准输出
+searxng-run.err.log      SearXNG 启动器标准错误
+broker-run.log          API Pool 启动器标准输出（启用时）
+broker-console.err.log  API Pool 启动器标准错误（启用时）
+broker-run.err.log      API Pool 诊断警告与错误（启用时）
 ```
+
+启动正常时，错误日志可能为空文件；未启用 API Pool 时也不会产生它的运行日志。
+启动后可用 `check-searxng.cmd` 检查本地健康状态（不调用外部搜索）；
+需要实际测试搜索时，可运行 `scripts\check.ps1 -LiveSearch`，这可能消耗 API 额度。
+
+安装目录包含空格、中文等非 ASCII 字符通常可正常使用；但应避免方括号
+（`[`、`]`）：Windows PowerShell 5.1 对这类路径的进程日志重定向不可靠，
+启动器会在创建后台进程前直接提示错误。
 
 - `8888` 是 SearXNG 端口；`8890` 是可选 API Pool Broker 端口。
 - 某个搜索引擎失败时，通常不会阻止其他引擎返回结果。
@@ -217,12 +236,19 @@ broker-run.err.log
 
 ## CI 与 Release
 
-每次 push 和 pull request 都会运行 Windows CI：检查 PowerShell 语法、编译
-Python、运行 API Pool 测试，并执行公开包防泄漏检查。
+每次 push 和 pull request 都会运行 Windows CI：PowerShell 启动器回归测试、
+Python 编译、API Pool 单元测试、公开包防泄漏检查，以及实际 Windows
+安装、启动、健康检查、停止、重装保留配置、上游更新测试。
 
-推送 `v0.2.0` 这类语义化版本标签后，会触发 Release 工作流。它会重新验证代码、
-确认标签对应的提交属于 `main`、构建 ZIP 和 bootstrap 安装器、生成 SHA-256
-校验文件，然后自动创建 GitHub Release。
+此外，安装矩阵会从 GitHub 下载真正的 CMD/PowerShell 安装器，覆盖
+Windows Server 2022/2025 × Python 3.11/3.12。扩展测试还会启动
+SearXNG + API Pool 双服务、验证无 Key 时的免费回退、模拟更新失败并
+验证回滚，最后确认停止后端口释放。
+
+推送 `v0.2.7` 这类语义化版本标签后，会触发 Release 工作流。
+工作流验证该提交属于 `main`，并且**必须先通过从 GitHub 下载安装器、
+启动双服务及更新失败回滚的实际验收**，才构建正式 ZIP、安装器及
+SHA-256 校验文件并自动发布。
 
 ## 许可证
 
