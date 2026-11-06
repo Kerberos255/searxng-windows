@@ -123,3 +123,28 @@ jobs:
               & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\stop.ps1") -Root $Root
             }
           }
+
+  windows-bootstrap-matrix:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+        python: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Download exact PR installer from GitHub and run CMD bootstrap
+        shell: powershell
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_EXTENDED: ${{ matrix.os == 'windows-2025' && matrix.python == '3.12' }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\tests\windows-bootstrap-smoke.ps1 -Ref $env:CANDIDATE_SHA -RuntimePython (Get-Command python).Source -Extended:($env:RUN_EXTENDED -eq 'true')
