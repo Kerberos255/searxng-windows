@@ -37,6 +37,7 @@ SearXNG-compatible search backend for tools and AI agents.
 - Python 3.11 or 3.12 x64
 - Internet access during installation
 - Git is not required; the installer downloads the upstream source ZIP and skips filenames that Windows cannot create
+- The full installation workflow is CI-tested on Windows Server 2022/2025 with Python 3.11/3.12; desktop Windows 10/11 configurations can differ
 
 ## Quick Start
 
@@ -92,7 +93,9 @@ To enable it:
 
 1. Edit `%USERPROFILE%\Apps\searxng-windows\config\settings.yml`.
 2. Change the `api pool` entry from `disabled: true` to `disabled: false`.
-3. Add at least one key to `config\api-pool.env`:
+3. Optionally add API provider keys to `config\api-pool.env`. The installer creates
+   this file with empty placeholders; leave them blank to use the free SearXNG
+   fallback without a paid API provider:
 
 ```dotenv
 BRAVE_API_KEY=
@@ -116,17 +119,20 @@ Parallel -> Tavily -> Brave -> Firecrawl -> Bing/Sogou/Qwant/Mojeek free fallbac
 
 It stops after the first API provider with results, so one search does not
 consume all configured quotas. Empty results continue to the next API provider.
-Only when the complete API tier is unavailable or empty does the gateway query
-the free Bing, Sogou, Qwant, and Mojeek engines through SearXNG on port `8888`.
-When the API Pool is disabled, clients should remain on port `8888` and use
-ordinary SearXNG directly. Relative `time_range=day|week|month|year` filters are
-best-effort: engines with native support receive the restriction, while unsupported
-engines continue searching without it. Returned pages may therefore be older or
-have no known publication date. Date-limited Tavily searches request publication
-metadata when available, without automatically discarding undated sources.
-For time-sensitive research, verify dates in the original pages. Exact filters use `date_after` and `date_before` in
-`YYYY-MM-DD` format. See [`api_pool/README.md`](api_pool/README.md) for endpoint,
-state, and fallback details.
+Only when the API tier is unavailable or empty does the gateway query the free
+Bing, Sogou, Qwant, and Mojeek engines through SearXNG on port `8888`. This also
+works when **no API keys are configured**, provided the free search backend is
+reachable. If the API Pool is disabled, clients should stay on port `8888` and
+use ordinary SearXNG directly.
+
+Relative `time_range=day|week|month|year` filters are best-effort: engines with
+native support receive the restriction, while unsupported engines still search
+without it. Results may therefore include older pages or lack a known publication
+date. Date-limited Tavily searches request publication metadata where available
+without discarding undated sources. Exact boundaries use `date_after` and
+`date_before` in `YYYY-MM-DD` format. For time-sensitive research, verify dates
+on the original pages. See [`api_pool/README.md`](api_pool/README.md) for the API,
+provider state, and fallback details.
 
 ## Proxy Configuration
 
@@ -198,27 +204,37 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Root "$env:USERP
 The install script creates `config/settings.yml` and generates its local secret
 automatically when the file does not already exist. Use `-RuntimePython` with a
 full executable path when `python` is not available in `PATH`. The bootstrap
-installer accepts `-Ref v0.2.0` when a specific release must be pinned.
+installer accepts `-Ref v0.2.7` when a specific release must be pinned.
 
 ## Troubleshooting
 
-Run `scripts\check.ps1` first. Useful logs in the installation directory are:
+**Installation does not create runtime logs.** After installation, start the
+service with `start-searxng.cmd`. If startup fails before the background process
+is created (for example, an invalid path or a missing helper script), the log
+files may **not exist at all**. In that case, read and copy the error shown in
+the CMD window first; the absence of a log is not itself a separate failure.
+
+When background startup proceeds, output is redirected into these files in the
+**installation root** (normally `%USERPROFILE%\Apps\searxng-windows`):
 
 ```text
-searxng-run.log
-searxng-run.err.log
-broker-run.log
-broker-run.err.log
+searxng-run.log          SearXNG launcher standard output
+searxng-run.err.log      SearXNG launcher standard error
+broker-run.log          API Pool launcher standard output (when enabled)
+broker-console.err.log  API Pool launcher standard error (when enabled)
+broker-run.err.log      API Pool diagnostic warnings/errors (when enabled)
 ```
 
-Installation folders with spaces and non-ASCII characters are supported. Avoid
-square brackets (`[` or `]`) in installation paths: Windows PowerShell 5.1
-Start-Process log redirection does not reliably support those paths. The
-launcher reports this limitation before starting a service.
+The error logs may exist but be empty when startup succeeds. API Pool logs are
+not expected while the API Pool is disabled. After startup, run
+`check-searxng.cmd` to check local service health without making a live search;
+use `scripts\check.ps1 -LiveSearch` for an upstream search test (which may use
+provider credits).
 
-If the launcher fails before SearXNG starts, no runtime log files may exist yet.
-Read the error printed in the CMD window first. The installer and launchers
-support installation folders containing spaces and non-ASCII characters.
+Installation folders containing spaces or non-ASCII characters are supported.
+Avoid square brackets (`[` or `]`) in installation paths: Windows PowerShell 5.1
+cannot reliably redirect process logs for those paths, so the launcher reports
+an error before creating the background process.
 
 - Port `8888` is SearXNG; port `8890` is the optional API Pool Broker.
 - A failed search engine does not normally block results from other engines.
@@ -238,13 +254,21 @@ This repository intentionally does not contain:
 
 ## CI and Releases
 
-Pushes and pull requests run the Windows CI checks: PowerShell parsing, Python
-compilation, API Pool tests, and public-package safety checks.
+Pushes and pull requests run Windows CI: PowerShell launcher regression tests,
+Python compilation, API Pool unit tests, and public-package safety checks.
+Integration jobs also install SearXNG, launch and health-check it, stop and
+reinstall while preserving settings, and test an upstream source update. A
+separate matrix downloads the actual CMD and PowerShell bootstrap installers
+from GitHub and tests Windows Server 2022/2025 with Python 3.11/3.12. The
+extended case starts both SearXNG and the API Pool, exercises the no-key free
+fallback, injects an update failure to verify rollback, and checks that both
+service ports close after stopping.
 
-Pushing a semantic version tag such as `v0.2.0` triggers the Release workflow.
-It repeats validation, verifies that the tagged commit belongs to `main`, builds
-the release ZIP and bootstrap installers, generates SHA-256 checksums, and then
-creates the GitHub Release automatically.
+Pushing a semantic version tag such as `v0.2.7` triggers the Release workflow.
+It verifies that the tagged commit belongs to `main` and **must pass a real
+GitHub-downloaded installer, dual-service, and rollback smoke test before**
+building release assets. It then produces the ZIP and bootstrap installers,
+generates SHA-256 checksums, and publishes a GitHub Release automatically.
 
 ## License
 
