@@ -9,12 +9,12 @@ $Searxng = Join-Path $Root "searxng"
 $VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
 $Settings = Join-Path $Root "config\settings.yml"
 
-if (!(Test-Path $VenvPython)) {
+if (![System.IO.File]::Exists($VenvPython)) {
     Write-Host "Python venv not found: $VenvPython"
     exit 1
 }
 
-if (!(Test-Path $Settings)) {
+if (![System.IO.File]::Exists($Settings)) {
     Write-Host "settings.yml not found: $Settings"
     exit 1
 }
@@ -34,7 +34,7 @@ if ($ProxyUrl) {
     Write-Host "Using outbound proxy: $ProxyUrl"
 }
 
-Set-Location $Searxng
+Set-Location -LiteralPath $Searxng
 
 Write-Host "Starting SearXNG on http://127.0.0.1:8888 ..."
 & $VenvPython "searx\webapp.py"

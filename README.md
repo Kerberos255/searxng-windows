@@ -96,9 +96,9 @@ To enable it:
 
 ```dotenv
 BRAVE_API_KEY=
-FIRECRAWL_API_KEY=
+[REDACTED]
 TAVILY_API_KEY=
-PARALLEL_API_KEY=
+[REDACTED]
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
@@ -210,6 +210,10 @@ searxng-run.err.log
 broker-run.log
 broker-run.err.log
 ```
+
+If the launcher fails before SearXNG starts, no runtime log files may exist yet.
+Read the error printed in the CMD window first. The installer and launchers
+support installation folders containing spaces and non-ASCII characters.
 
 - Port `8888` is SearXNG; port `8890` is the optional API Pool Broker.
 - A failed search engine does not normally block results from other engines.

@@ -9,11 +9,11 @@ $ErrorActionPreference = "Stop"
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
 $Broker = Join-Path $Root "api_pool\app.py"
 
-if (!(Test-Path $Python)) {
+if (![System.IO.File]::Exists($Python)) {
     Write-Host "Python venv not found: $Python"
     exit 1
 }
-if (!(Test-Path $Broker)) {
+if (![System.IO.File]::Exists($Broker)) {
     Write-Host "API Pool Broker not found: $Broker"
     exit 1
 }
@@ -35,6 +35,6 @@ if ($ProxyUrl) {
 $env:NO_PROXY = "127.0.0.1,localhost"
 $env:no_proxy = "127.0.0.1,localhost"
 
-Set-Location $Root
+Set-Location -LiteralPath $Root
 Write-Host "Starting API Pool Broker on http://127.0.0.1:8890 ..."
 & $Python $Broker

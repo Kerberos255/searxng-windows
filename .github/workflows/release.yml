@@ -38,6 +38,7 @@ jobs:
           $scripts = @(
             Get-Item -Path install-searxng-windows.ps1
             Get-ChildItem -Path scripts -Filter *.ps1
+            Get-ChildItem -Path tests -Filter *.ps1
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -47,6 +48,11 @@ jobs:
               throw "PowerShell syntax errors in $($script.FullName): $($errors | Out-String)"
             }
           }
+
+      - name: Windows launcher regression tests
+        shell: powershell
+        run: |
+          .\tests\windows-launchers.ps1
 
       - name: Check Python syntax
         shell: pwsh
@@ -89,7 +95,7 @@ jobs:
       - name: Create GitHub Release
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: [REDACTED]{{ github.token }}
         run: |
           $Assets = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
           gh release create $env:GITHUB_REF_NAME $Assets `

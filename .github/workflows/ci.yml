@@ -22,7 +22,8 @@ jobs:
         run: |
           $scripts = @(
             Get-Item -Path install-searxng-windows.ps1
-            Get-ChildItem -Path scripts -Filter *.ps1
+            Get-ChildItem -Path scripts -Filter *.ps1            Get-ChildItem -Path tests -Filter *.ps1
+
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -32,6 +33,11 @@ jobs:
               Write-Error "PowerShell syntax errors in $($script.FullName): $($errors | Out-String)"
             }
           }
+
+      - name: Exercise CMD launchers and subprocess quoting
+        shell: powershell
+        run: |
+          .\tests\windows-launchers.ps1
 
       - name: Verify stop-script no-op does not target unrelated processes
         shell: powershell
@@ -61,3 +67,47 @@ jobs:
         run: |
           python -m pip install -r api_pool/requirements.txt
           python -m unittest discover -s api_pool/tests -v
+
+  windows-install-smoke:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install and launch actual SearXNG in Windows
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Root = Join-Path $env:RUNNER_TEMP "searxng install with spaces"
+          try {
+            .\scripts\install.ps1 -Root $Root -RuntimePython (Get-Command python).Source
+            if ($LASTEXITCODE -ne 0) { throw "Initial install failed: $LASTEXITCODE" }
+            $Settings = Join-Path $Root "config\settings.yml"
+            $SavedSettings = [IO.File]::ReadAllText($Settings)
+
+            & (Join-Path $Root "start-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Start launcher failed: $LASTEXITCODE" }
+            & (Join-Path $Root "check-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Check launcher failed: $LASTEXITCODE" }
+            $Response = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 15
+            if ($Response.StatusCode -ne 200) { throw "Unexpected HTTP $($Response.StatusCode)" }
+
+            & (Join-Path $Root "stop-searxng.cmd")
+            if ($LASTEXITCODE -ne 0) { throw "Stop launcher failed: $LASTEXITCODE" }
+
+            .\scripts\install.ps1 -Root $Root -RuntimePython (Get-Command python).Source
+            if ($LASTEXITCODE -ne 0) { throw "Reinstall failed: $LASTEXITCODE" }
+            if ([IO.File]::ReadAllText($Settings) -cne $SavedSettings) {
+              throw "Reinstall modified user settings."
+            }
+            Write-Host "PASS Windows install, launch, health, stop, config-preserving reinstall."
+          } finally {
+            if (Test-Path -LiteralPath (Join-Path $Root "scripts\stop.ps1")) {
+              & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\stop.ps1") -Root $Root
+            }
+          }
