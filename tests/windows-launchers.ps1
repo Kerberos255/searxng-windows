@@ -68,6 +68,24 @@ param([string]$Root)
         throw "Corrupt argument in child: expected '$Expected', got '$Actual'"
     }
     Write-Host "PASS native child argument quoting with spaces and Unicode."
+
+    # Bracket paths are legal on Windows but unsupported by PS 5.1 Start-Process
+    # log redirection. The launcher must give a readable error, not a stack trace.
+    $OriginalFixture = $Fixture
+    $BracketFixture = Join-Path ([IO.Path]::GetTempPath()) ("searxng [brackets] " + [guid]::NewGuid().ToString("N"))
+    try {
+        $Fixture = $BracketFixture
+        New-Item -ItemType Directory -Force -Path (Join-Path $Fixture "scripts") | Out-Null
+        Copy-Item -LiteralPath (Join-Path $SourceRoot "start-searxng.cmd") -Destination (Join-Path $Fixture "start-searxng.cmd")
+        Copy-Item -LiteralPath (Join-Path $SourceRoot "scripts\start.ps1") -Destination (Join-Path $Fixture "scripts\start.ps1")
+        Assert-Launch "start-searxng.cmd" 1 "Unsupported installation directory: square brackets"
+        Write-Host "PASS unsupported bracket path reports actionable error."
+    } finally {
+        $Fixture = $OriginalFixture
+        if ([IO.Directory]::Exists($BracketFixture)) {
+            Remove-Item -LiteralPath $BracketFixture -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 } finally {
     $env:CI = $PreviousCI
     if ([IO.Directory]::Exists($Fixture)) {
