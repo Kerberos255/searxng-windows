@@ -21,6 +21,19 @@ function Assert-Http {
     if ($Response.StatusCode -ne 200) { throw "$Uri returned HTTP $($Response.StatusCode)." }
 }
 
+function Assert-PortsClosed {
+    param([int[]]$Ports)
+    foreach ($Port in $Ports) {
+        $Listener = $null
+        for ($Attempt = 0; $Attempt -lt 20; $Attempt++) {
+            $Listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+            if (!$Listener) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        if ($Listener) { throw "Service port $Port remains listening after stop." }
+    }
+}
+
 function Assert-Settings {
     param([string]$Expected)
     $Actual = [IO.File]::ReadAllText((Join-Path $InstallRoot "config\settings.yml"))
@@ -56,6 +69,7 @@ try {
     Invoke-Launcher "check-searxng.cmd"
     Assert-Http "http://127.0.0.1:8888/"
     Invoke-Launcher "stop-searxng.cmd"
+    Assert-PortsClosed @(8888)
     Write-Host "PASS downloaded CMD bootstrap -> installation -> 8888 HTTP 200 -> check -> stop"
 
     if ($Extended) {
@@ -116,6 +130,7 @@ try {
         Invoke-Launcher "check-searxng.cmd"
         Write-Host "PASS failure-injected update restores source, settings and services"
         Invoke-Launcher "stop-searxng.cmd"
+        Assert-PortsClosed @(8888, 8890)
     }
     Write-Host "PASS GitHub bootstrap smoke: $Ref"
 } finally {
