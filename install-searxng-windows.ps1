@@ -29,11 +29,19 @@ if (!$Ref) {
 }
 
 try {
-    $ArchiveUrl = "https://github.com/$Repo/archive/refs/tags/$Ref.zip"
+    # Explicit SHA pins CI installation to the exact reviewed commit.
+    if ($Ref -match '^[0-9a-fA-F]{40}$') {
+        $ArchiveUrl = "https://github.com/$Repo/archive/$Ref.zip"
+    } elseif ($Ref -match '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') {
+        $ArchiveUrl = "https://github.com/$Repo/archive/refs/tags/$Ref.zip"
+    } else {
+        throw "Invalid release tag or commit SHA."
+    }
     Write-Host "Downloading installer package: $ArchiveUrl"
     Invoke-WebRequest -Uri $ArchiveUrl -OutFile $ZipPath -UseBasicParsing
 
     tar -xf $ZipPath -C $ExtractPath
+    if ($LASTEXITCODE -ne 0) { throw "Installer archive extraction failed." }
     $PackageRoot = Get-ChildItem -LiteralPath $ExtractPath -Directory | Select-Object -First 1
     if (!$PackageRoot) {
         throw "Installer package did not contain an extracted directory."

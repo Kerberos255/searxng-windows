@@ -38,6 +38,7 @@ jobs:
           $scripts = @(
             Get-Item -Path install-searxng-windows.ps1
             Get-ChildItem -Path scripts -Filter *.ps1
+            Get-ChildItem -Path tests -Filter *.ps1
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -47,6 +48,11 @@ jobs:
               throw "PowerShell syntax errors in $($script.FullName): $($errors | Out-String)"
             }
           }
+
+      - name: Windows launcher regression tests
+        shell: powershell
+        run: |
+          .\tests\windows-launchers.ps1
 
       - name: Check Python syntax
         shell: pwsh
@@ -66,8 +72,25 @@ jobs:
           python -m pip install -r api_pool/requirements.txt
           python -m unittest discover -s api_pool/tests -v
 
-  publish:
+  windows-bootstrap-smoke:
     needs: validate
+    runs-on: windows-2025
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify GitHub-downloaded installers, both services and failed-update rollback
+        shell: powershell
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\tests\windows-bootstrap-smoke.ps1 -Ref $env:CANDIDATE_SHA -RuntimePython (Get-Command python).Source -Extended
+
+  publish:
+    needs: [validate, windows-bootstrap-smoke]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

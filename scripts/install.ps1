@@ -132,13 +132,10 @@ try {
         }
     }
 
-    & $Python -m pip install -e .
+    # Upstream packaging imports runtime dependencies already installed above.
+    & $Python -m pip install --no-build-isolation -e .
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Editable install failed with build isolation; retrying without build isolation."
-        & $Python -m pip install --no-build-isolation -e .
-        if ($LASTEXITCODE -ne 0) {
-            throw "Editable install failed with exit code $LASTEXITCODE."
-        }
+        throw "Editable install failed with exit code $LASTEXITCODE."
     }
 } finally {
     Pop-Location

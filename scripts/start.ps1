@@ -6,6 +6,56 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+try {
+    $Root = [System.IO.Path]::GetFullPath($Root)
+} catch {
+    Write-Host "Invalid installation root path: $Root"
+    Write-Host $_
+    exit 1
+}
+
+function Quote-NativeArgument {
+    param([AllowEmptyString()][string]$Value)
+
+    $Quoted = New-Object System.Text.StringBuilder
+    [void]$Quoted.Append('"')
+    $Backslashes = 0
+    foreach ($Character in $Value.ToCharArray()) {
+        if ($Character -eq [char]92) {
+            $Backslashes++
+            continue
+        }
+        if ($Character -eq [char]34) {
+            [void]$Quoted.Append(('\' * ($Backslashes * 2 + 1)))
+            [void]$Quoted.Append('"')
+            $Backslashes = 0
+            continue
+        }
+        if ($Backslashes -gt 0) {
+            [void]$Quoted.Append(('\' * $Backslashes))
+            $Backslashes = 0
+        }
+        [void]$Quoted.Append($Character)
+    }
+    if ($Backslashes -gt 0) {
+        [void]$Quoted.Append(('\' * ($Backslashes * 2)))
+    }
+    [void]$Quoted.Append('"')
+    return $Quoted.ToString()
+}
+
+function Join-NativeArguments {
+    param([string[]]$Values)
+    return (($Values | ForEach-Object { Quote-NativeArgument $_ }) -join ' ')
+}
+
+# Windows PowerShell 5.1 cannot reliably redirect Start-Process logs when
+# the installation path includes wildcard brackets. Fail clearly before launch.
+if ($Root.Contains('[') -or $Root.Contains(']')) {
+    Write-Host "Unsupported installation directory: square brackets [ ] are not supported by the Windows PowerShell 5.1 launcher. Please choose a folder without brackets."
+    exit 1
+}
+
 $RunScript = Join-Path $Root "scripts\run.ps1"
 $BrokerRunScript = Join-Path $Root "scripts\run_broker.ps1"
 $ApiPoolHelper = Join-Path $Root "scripts\api-pool.ps1"
@@ -59,7 +109,7 @@ function Rotate-LogFile {
     }
 }
 
-if (!(Test-Path $ApiPoolHelper)) {
+if (![System.IO.File]::Exists($ApiPoolHelper)) {
     Write-Host "API Pool helper not found: $ApiPoolHelper"
     exit 1
 }
@@ -81,7 +131,7 @@ if ($ApiPoolEnabled) {
     } catch {
     }
 
-    if (!$BrokerRunning -and (Test-Path $BrokerPidFile)) {
+    if (!$BrokerRunning -and [System.IO.File]::Exists($BrokerPidFile)) {
         $OldPid = Get-Content -LiteralPath $BrokerPidFile -ErrorAction SilentlyContinue
         if ($OldPid -and (Get-Process -Id $OldPid -ErrorAction SilentlyContinue)) {
             Write-Host "API Pool Broker launcher already exists, PID: $OldPid"
@@ -101,7 +151,7 @@ if ($ApiPoolEnabled) {
         }
 
         $BrokerArgs = @(
-            "-ExecutionPolicy", "Bypass",
+            "-NoProfile", "-ExecutionPolicy", "Bypass",
             "-File", $BrokerRunScript,
             "-Root", $Root,
             "-EnvFile", $EnvFile
@@ -112,7 +162,7 @@ if ($ApiPoolEnabled) {
 
         $BrokerProcess = Start-Process `
             -FilePath "powershell.exe" `
-            -ArgumentList $BrokerArgs `
+            -ArgumentList (Join-NativeArguments $BrokerArgs) `
             -WorkingDirectory $Root `
             -WindowStyle Hidden `
             -RedirectStandardOutput $BrokerLog `
@@ -161,7 +211,7 @@ try {
 } catch {
 }
 
-if (Test-Path $PidFile) {
+if ([System.IO.File]::Exists($PidFile)) {
     $OldPid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue
     if ($OldPid -and (Get-Process -Id $OldPid -ErrorAction SilentlyContinue)) {
         Write-Host "SearXNG launcher already exists, PID: $OldPid"
@@ -176,14 +226,14 @@ foreach ($Path in @($Log, $ErrLog)) {
     Rotate-LogFile -Path $Path
 }
 
-$SearxngArgs = @("-ExecutionPolicy", "Bypass", "-File", $RunScript, "-Root", $Root)
+$SearxngArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $RunScript, "-Root", $Root)
 if ($ProxyUrl) {
     $SearxngArgs += @("-ProxyUrl", $ProxyUrl)
 }
 
 $Process = Start-Process `
     -FilePath "powershell.exe" `
-    -ArgumentList $SearxngArgs `
+    -ArgumentList (Join-NativeArguments $SearxngArgs) `
     -WorkingDirectory $Root `
     -WindowStyle Hidden `
     -RedirectStandardOutput $Log `

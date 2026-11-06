@@ -4,7 +4,7 @@ function Test-ApiPoolEnabled {
     )
 
     $SettingsPath = Join-Path $Root "config\settings.yml"
-    if (!(Test-Path $SettingsPath)) {
+    if (![System.IO.File]::Exists($SettingsPath)) {
         return $false
     }
 
