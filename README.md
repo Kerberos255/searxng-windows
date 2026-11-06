@@ -211,6 +211,11 @@ broker-run.log
 broker-run.err.log
 ```
 
+Installation folders with spaces and non-ASCII characters are supported. Avoid
+square brackets (`[` or `]`) in installation paths: Windows PowerShell 5.1
+Start-Process log redirection does not reliably support those paths. The
+launcher reports this limitation before starting a service.
+
 If the launcher fails before SearXNG starts, no runtime log files may exist yet.
 Read the error printed in the CMD window first. The installer and launchers
 support installation folders containing spaces and non-ASCII characters.
