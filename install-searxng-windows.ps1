@@ -29,7 +29,58 @@ if (!$Ref) {
 }
 
 try {
-    $ArchiveUrl = "https://github.com/$Repo/archive/refs/tags/$Ref.zip"
+    # CI may pin an immutable commit to exercise the public bootstrap path.
+    # Normal interactive installation still selects the latest release tag.
+    if ($Ref -match '^[0-9a-fA-F]{40}
+    Invoke-WebRequest -Uri $ArchiveUrl -OutFile $ZipPath -UseBasicParsing
+
+    tar -xf $ZipPath -C $ExtractPath
+    if ($LASTEXITCODE -ne 0) { throw "Installer archive extraction failed." }
+    $PackageRoot = Get-ChildItem -LiteralPath $ExtractPath -Directory | Select-Object -First 1
+    if (!$PackageRoot) {
+        throw "Installer package did not contain an extracted directory."
+    }
+
+    $InstallScript = Join-Path $PackageRoot.FullName "scripts\install.ps1"
+    if (!(Test-Path $InstallScript)) {
+        throw "install.ps1 not found in installer package."
+    }
+
+    & powershell -ExecutionPolicy Bypass -File $InstallScript -Root $Root -RuntimePython $RuntimePython
+    if ($LASTEXITCODE -ne 0) {
+        throw "SearXNG installation failed with exit code $LASTEXITCODE."
+    }
+} finally {
+    Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+) {
+        $ArchiveUrl = "https://github.com/$Repo/archive/$Ref.zip"
+    } elseif ($Ref -match '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?
+    Invoke-WebRequest -Uri $ArchiveUrl -OutFile $ZipPath -UseBasicParsing
+
+    tar -xf $ZipPath -C $ExtractPath
+    $PackageRoot = Get-ChildItem -LiteralPath $ExtractPath -Directory | Select-Object -First 1
+    if (!$PackageRoot) {
+        throw "Installer package did not contain an extracted directory."
+    }
+
+    $InstallScript = Join-Path $PackageRoot.FullName "scripts\install.ps1"
+    if (!(Test-Path $InstallScript)) {
+        throw "install.ps1 not found in installer package."
+    }
+
+    & powershell -ExecutionPolicy Bypass -File $InstallScript -Root $Root -RuntimePython $RuntimePython
+    if ($LASTEXITCODE -ne 0) {
+        throw "SearXNG installation failed with exit code $LASTEXITCODE."
+    }
+} finally {
+    Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+) {
+        $ArchiveUrl = "https://github.com/$Repo/archive/refs/tags/$Ref.zip"
+    } else {
+        throw "Invalid release tag or commit reference: $Ref"
+    }
     Write-Host "Downloading installer package: $ArchiveUrl"
     Invoke-WebRequest -Uri $ArchiveUrl -OutFile $ZipPath -UseBasicParsing
 
