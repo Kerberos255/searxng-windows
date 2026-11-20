@@ -89,6 +89,45 @@ if (![IO.File]::Exists($WebappFile) -or ![IO.File]::Exists($DefaultTemplate)) {
     Write-Host "HTML result-template routing: OK"
 }
 
+# Default search priority hook must be installed for API-first routing.
+if ([IO.File]::Exists($WebappFile) -and
+    !(Select-String -LiteralPath $WebappFile -SimpleMatch -Pattern 'apply_default_search_priority(search_query, raw_text_query, sxng_request.form)' -Quiet)) {
+    Write-Host "Default API-first search routing patch is missing."
+    $AllOk = $false
+}
+# Verify CSS/JS links will resolve to their actual theme assets on Windows.
+$StaticCss = [IO.Path]::Combine($Root, "searxng\searx\static\themes\simple\sxng-ltr.min.css")
+if (![IO.File]::Exists($StaticCss) -or
+    !(Select-String -LiteralPath $WebappFile -SimpleMatch -Pattern '_STATIC_FILES = [name.replace(os.sep, "/")' -Quiet)) {
+    Write-Host "Windows static URL routing patch missing."
+    $AllOk = $false
+}
+
+# Validate actual CSS/JS URLs referenced by the rendered homepage (no API cost).
+try {
+    $Page = Invoke-WebRequest -Uri "$SearxngUrl/" -UseBasicParsing -TimeoutSec 5
+    foreach ($Asset in @(
+        "/static/themes/simple/sxng-ltr.min.css",
+        "/static/themes/simple/sxng-core.min.js",
+        "/static/themes/simple/img/favicon.svg"
+    )) {
+        if (!$Page.Content.Contains($Asset)) {
+            Write-Host "Homepage does not reference expected static asset: $Asset"
+            $AllOk = $false
+            continue
+        }
+        $AssetReply = Invoke-WebRequest -Uri "$SearxngUrl$Asset" -UseBasicParsing -TimeoutSec 5
+        if ($AssetReply.StatusCode -ne 200) {
+            Write-Host "Static asset failed: $Asset HTTP $($AssetReply.StatusCode)"
+            $AllOk = $false
+        }
+    }
+    if ($AllOk) { Write-Host "Homepage CSS, JS and favicon URLs: HTTP 200" }
+} catch {
+    Write-Host "Static asset health check failed:" $_
+    $AllOk = $false
+}
+
 if ($AllOk) {
     Write-Host "All checks passed."
     exit 0

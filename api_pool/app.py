@@ -410,7 +410,8 @@ def search():
     """Execute API-first search with a bounded request budget.
 
     GET uses the gateway budget and reserves time for free SearXNG fallback.
-    POST is used by the SearXNG engine adapter and stays within its shorter timeout.
+    POST is used by the SearXNG engine adapter and also reserves time for
+    a free-engine fallback when all API providers have no results.
     """
     if request.method == "GET":
         data = {
@@ -439,21 +440,22 @@ def search():
         else config.API_POOL_GATEWAY_TIMEOUT
     )
     deadline = time.monotonic() + max(0.1, total_timeout)
-    if request.method == "POST":
+    if not search_input["fallback_on_empty"] or not config.SEARXNG_FREE_FALLBACK:
         api_deadline = deadline
     else:
-        reserve = min(
-            config.SEARXNG_FALLBACK_RESERVE,
-            max(0.1, total_timeout - 0.1),
+        fallback_reserve = (
+            config.API_POOL_ENGINE_FALLBACK_RESERVE
+            if request.method == "POST"
+            else config.SEARXNG_FALLBACK_RESERVE
         )
+        reserve = min(max(0.0, fallback_reserve), max(0.1, total_timeout - 0.1))
         api_deadline = deadline - reserve
 
     api_result = _run_api_search(search_input, deadline=api_deadline)
-    if api_result["results"] or request.method == "POST":
-        if request.method == "GET":
-            api_result["query"] = search_input["query"]
-            api_result["number_of_results"] = len(api_result["results"])
-            api_result["fallback_used"] = False
+    if api_result["results"] or (request.method == "POST" and not search_input["fallback_on_empty"]):
+        api_result["query"] = search_input["query"]
+        api_result["number_of_results"] = len(api_result["results"])
+        api_result["fallback_used"] = False
         return jsonify(api_result)
 
     if not config.SEARXNG_FREE_FALLBACK:

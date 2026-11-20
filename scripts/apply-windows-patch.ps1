@@ -109,3 +109,19 @@ if (![System.IO.File]::Exists($ResultTemplatePatch)) {
 if ($LASTEXITCODE -ne 0) {
     throw "Windows result-template patch failed."
 }
+
+# Route default web searches to the API Pool only when provider credentials exist.
+$DefaultSearchPatch = Join-Path $ScriptRoot "patch_default_search_priority.py"
+if (![IO.File]::Exists($DefaultSearchPatch)) {
+    throw "Default search priority patch script is missing."
+}
+& $VenvPython $DefaultSearchPatch $Root
+if ($LASTEXITCODE -ne 0) {
+    throw "Default search priority patch failed."
+}
+
+# Fix Windows paths in the CSS/JS/image registry for the simple theme.
+$StaticUrlPatch = Join-Path $ScriptRoot "patch_static_urls.py"
+if (![IO.File]::Exists($StaticUrlPatch)) { throw "Windows static URL patch script missing." }
+& $VenvPython $StaticUrlPatch $Root
+if ($LASTEXITCODE -ne 0) { throw "Windows static URL patch failed." }

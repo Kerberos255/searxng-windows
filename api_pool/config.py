@@ -131,6 +131,7 @@ HTTP_KEEPALIVE_EXPIRY = float(os.environ.get("API_POOL_KEEPALIVE_EXPIRY", "30"))
 # GET gateway calls reserve time for the free-engine fallback.
 API_POOL_GATEWAY_TIMEOUT = float(os.environ.get("API_POOL_GATEWAY_TIMEOUT", "27"))
 API_POOL_ENGINE_TIMEOUT = float(os.environ.get("API_POOL_ENGINE_TIMEOUT", "17"))
+API_POOL_ENGINE_FALLBACK_RESERVE = float(os.environ.get("API_POOL_ENGINE_FALLBACK_RESERVE", "5"))
 SEARXNG_FALLBACK_RESERVE = float(os.environ.get("SEARXNG_FALLBACK_RESERVE", "10"))
 SEARXNG_FALLBACK_TIMEOUT = float(os.environ.get("SEARXNG_FALLBACK_TIMEOUT", "10"))
 BROKER_LOG_FILE = ROOT_DIR / "broker-run.err.log"

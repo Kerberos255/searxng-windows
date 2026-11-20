@@ -76,22 +76,56 @@ class TestRequestBudgets(unittest.TestCase):
         self.assertEqual(api_search.call_args.kwargs["deadline"], 117)
         self.assertEqual(free_search.call_args.kwargs["deadline"], 127)
 
-    def test_engine_post_uses_shorter_budget_and_does_not_run_gateway_fallback(self):
+    def test_engine_post_reserves_time_and_falls_back_to_free_engines(self):
         api_result = {"provider": None, "results": [], "attempts": []}
-
+        free_result = {
+            "provider": "searxng_free",
+            "fallback_used": True,
+            "results": [{"url": "https://example.test", "title": "Free result"}],
+        }
         with (
             patch.object(config, "API_POOL_ENGINE_TIMEOUT", 17),
+            patch.object(config, "API_POOL_ENGINE_FALLBACK_RESERVE", 5),
+            patch.object(config, "SEARXNG_FREE_FALLBACK", True),
             patch("api_pool.app.time.monotonic", return_value=100),
             patch("api_pool.app._run_api_search", return_value=api_result) as api_search,
-            patch("api_pool.app._run_free_search") as free_search,
+            patch("api_pool.app._run_free_search", return_value=free_result) as free_search,
         ):
             response = self.client.post(
-                "/search",
-                json={"query": "budget-test", "fallback_on_empty": True},
+                "/search", json={"query": "budget-test", "fallback_on_empty": True}
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(api_search.call_args.kwargs["deadline"], 117)
+        self.assertEqual(api_search.call_args.kwargs["deadline"], 112)
+        self.assertEqual(free_search.call_args.kwargs["deadline"], 117)
+        self.assertEqual(response.json["results"][0]["title"], "Free result")
+
+    def test_engine_post_api_success_does_not_invoke_free_engines(self):
+        api_result = {"provider": "tavily", "results": [{"url": "https://example.test"}], "attempts": []}
+        with (
+            patch("api_pool.app._run_api_search", return_value=api_result),
+            patch("api_pool.app._run_free_search") as free_search,
+        ):
+            response = self.client.post(
+                "/search", json={"query": "budget-test", "fallback_on_empty": True}
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["provider"], "tavily")
+        self.assertFalse(response.json["fallback_used"])
+        free_search.assert_not_called()
+
+    def test_engine_post_free_fallback_can_be_disabled(self):
+        api_result = {"provider": None, "results": [], "attempts": []}
+        with (
+            patch.object(config, "SEARXNG_FREE_FALLBACK", False),
+            patch("api_pool.app._run_api_search", return_value=api_result),
+            patch("api_pool.app._run_free_search") as free_search,
+        ):
+            response = self.client.post(
+                "/search", json={"query": "budget-test", "fallback_on_empty": True}
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["results"], [])
         free_search.assert_not_called()
 
     def test_expired_provider_budget_skips_upstream_call(self):

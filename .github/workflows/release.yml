@@ -63,7 +63,10 @@ jobs:
             "patches/api_pool.py"
             "scripts/extract-source.py"
             "scripts/patch_result_templates.py"
+            "scripts/patch_default_search_priority.py"
+            "scripts/patch_static_urls.py"
             "tests/assert-installed-search.py"
+            "tests/assert-api-priority.py"
           )
           $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
           python -m py_compile @pythonFiles
