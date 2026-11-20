@@ -32,13 +32,13 @@ function Assert-SearchRendering {
         throw "SearXNG HTML search failed."
     }
     # Verify browser asset paths: homepage 200 is not enough if CSS/JS are 404.
-    $Home = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 15
+    $HomepageResponse = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 15
     foreach ($Asset in @(
         "/static/themes/simple/sxng-ltr.min.css",
         "/static/themes/simple/sxng-core.min.js",
         "/static/themes/simple/img/favicon.svg"
     )) {
-        if (!$Home.Content.Contains($Asset)) {
+        if (!$HomepageResponse.Content.Contains($Asset)) {
             throw "Homepage references the wrong Windows static asset path: $Asset"
         }
         $File = Invoke-WebRequest -Uri ("http://127.0.0.1:8888" + $Asset) -UseBasicParsing -TimeoutSec 15
