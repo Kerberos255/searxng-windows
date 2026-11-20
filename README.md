@@ -53,6 +53,9 @@ SearXNG-compatible search backend for tools and AI agents.
 
 The PowerShell scripts under `scripts\` remain available for automation and
 advanced options.
+New installations follow the browser UI language. Existing `config/settings.yml`
+files remain unchanged; to switch an older Chinese-language installation to
+browser detection, set `ui.default_locale` to `""` and restart SearXNG.
 
 The default installation directory is:
 
@@ -228,7 +231,7 @@ broker-run.err.log      API Pool diagnostic warnings/errors (when enabled)
 The error logs may exist but be empty when startup succeeds. API Pool logs are
 not expected while the API Pool is disabled. After startup, run
 `check-searxng.cmd` to check local service health without making a live search;
-use `scripts\check.ps1 -LiveSearch` for an upstream search test (which may use
+use `scripts\check.ps1 -LiveSearch` for an upstream JSON search test (which may use
 provider credits).
 
 Installation folders containing spaces or non-ASCII characters are supported.

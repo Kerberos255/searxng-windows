@@ -99,3 +99,13 @@ if (!(Test-Path -LiteralPath $TimeRangePatchScript -PathType Leaf) -or
 if ($LASTEXITCODE -ne 0) {
     throw "Date fallback patch failed."
 }
+
+# Normalize Windows HTML result template registry keys for Jinja.
+$ResultTemplatePatch = Join-Path $ScriptRoot "patch_result_templates.py"
+if (![System.IO.File]::Exists($ResultTemplatePatch)) {
+    throw "Windows result-template patch script is missing: $ResultTemplatePatch"
+}
+& $VenvPython $ResultTemplatePatch $Root
+if ($LASTEXITCODE -ne 0) {
+    throw "Windows result-template patch failed."
+}

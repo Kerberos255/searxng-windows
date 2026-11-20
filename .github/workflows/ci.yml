@@ -54,6 +54,8 @@ jobs:
             "skill/scripts/searxng.py"
             "patches/api_pool.py"
             "scripts/extract-source.py"
+            "scripts/patch_result_templates.py"
+            "tests/assert-installed-search.py"
           )
           $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
           python -m py_compile @pythonFiles
@@ -97,6 +99,10 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Check launcher failed: $LASTEXITCODE" }
             $Response = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 15
             if ($Response.StatusCode -ne 200) { throw "Unexpected HTTP $($Response.StatusCode)" }
+            & (Join-Path $Root ".venv\Scripts\python.exe") ".\tests\assert-installed-search.py" $Root
+            if ($LASTEXITCODE -ne 0) { throw "Result-template verification failed." }
+            $Html = Invoke-WebRequest -Uri "http://127.0.0.1:8888/search?q=searxng+windows&format=html" -UseBasicParsing -TimeoutSec 50
+            if ($Html.StatusCode -ne 200 -or $Html.Content -notmatch '<html') { throw "HTML search failed." }
 
             & (Join-Path $Root "stop-searxng.cmd")
             if ($LASTEXITCODE -ne 0) { throw "Stop launcher failed: $LASTEXITCODE" }
@@ -113,6 +119,8 @@ jobs:
             }
             & (Join-Path $Root "start-searxng.cmd")
             if ($LASTEXITCODE -ne 0) { throw "Post-update startup failed: $LASTEXITCODE" }
+            & (Join-Path $Root ".venv\Scripts\python.exe") ".\tests\assert-installed-search.py" $Root
+            if ($LASTEXITCODE -ne 0) { throw "Post-update result-template verification failed." }
             & (Join-Path $Root "check-searxng.cmd")
             if ($LASTEXITCODE -ne 0) { throw "Post-update health check failed: $LASTEXITCODE" }
             & (Join-Path $Root "stop-searxng.cmd")
