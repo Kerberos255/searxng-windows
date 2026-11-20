@@ -32,7 +32,7 @@ search:
 
 ui:
   static_use_hash: true
-  default_locale: "zh-Hans-CN"
+  default_locale: ""  # Use the browser language for new installations.
   query_in_title: false
   infinite_scroll: false
 

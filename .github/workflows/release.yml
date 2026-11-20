@@ -62,6 +62,8 @@ jobs:
             "skill/scripts/searxng.py"
             "patches/api_pool.py"
             "scripts/extract-source.py"
+            "scripts/patch_result_templates.py"
+            "tests/assert-installed-search.py"
           )
           $pythonFiles += Get-ChildItem -Path api_pool -Filter *.py -Recurse | ForEach-Object { $_.FullName }
           python -m py_compile @pythonFiles

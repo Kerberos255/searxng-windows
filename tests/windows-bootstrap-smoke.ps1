@@ -21,6 +21,19 @@ function Assert-Http {
     if ($Response.StatusCode -ne 200) { throw "$Uri returned HTTP $($Response.StatusCode)." }
 }
 
+function Assert-SearchRendering {
+    $Python = Join-Path $InstallRoot ".venv\Scripts\python.exe"
+    $Verifier = Join-Path $PSScriptRoot "assert-installed-search.py"
+    & $Python $Verifier $InstallRoot
+    if ($LASTEXITCODE -ne 0) { throw "Installed HTML result-template verification failed." }
+    # Search HTML directly; checking only / or the JSON API missed issue #6.
+    $Response = Invoke-WebRequest -Uri "http://127.0.0.1:8888/search?q=searxng+windows&categories=general&format=html" -UseBasicParsing -TimeoutSec 50
+    if ($Response.StatusCode -ne 200 -or $Response.Content -notmatch '<html') {
+        throw "SearXNG HTML search failed."
+    }
+    Write-Host "PASS installed HTML templates and /search"
+}
+
 function Assert-PortsClosed {
     param([int[]]$Ports)
     foreach ($Port in $Ports) {
@@ -68,6 +81,7 @@ try {
     Invoke-Launcher "start-searxng.cmd"
     Invoke-Launcher "check-searxng.cmd"
     Assert-Http "http://127.0.0.1:8888/"
+    Assert-SearchRendering
     Invoke-Launcher "stop-searxng.cmd"
     Assert-PortsClosed @(8888)
     Write-Host "PASS downloaded CMD bootstrap -> installation -> 8888 HTTP 200 -> check -> stop"
@@ -86,6 +100,7 @@ try {
         Invoke-Launcher "start-searxng.cmd"
         Invoke-Launcher "check-searxng.cmd"
         Assert-Http "http://127.0.0.1:8888/"
+        Assert-SearchRendering
         $Health = Invoke-RestMethod -Uri "http://127.0.0.1:8890/health" -TimeoutSec 12
         if ($Health.status -ne "ok") { throw "API Pool broker did not become healthy." }
 
@@ -128,6 +143,7 @@ try {
         Assert-Settings $EnabledSettings
         Invoke-Launcher "start-searxng.cmd"
         Invoke-Launcher "check-searxng.cmd"
+        Assert-SearchRendering
         Write-Host "PASS failure-injected update restores source, settings and services"
         Invoke-Launcher "stop-searxng.cmd"
         Assert-PortsClosed @(8888, 8890)

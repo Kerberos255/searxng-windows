@@ -76,6 +76,19 @@ if ($LiveSearch) {
     Write-Host "Live search skipped. Use -LiveSearch to call upstream providers/search engines."
 }
 
+# Offline HTML-template integrity check. Homepage 200 alone cannot catch this failure.
+$WebappFile = [IO.Path]::Combine($Root, "searxng\searx\webapp.py")
+$DefaultTemplate = [IO.Path]::Combine($Root, "searxng\searx\templates\simple\result_templates\default.html")
+if (![IO.File]::Exists($WebappFile) -or ![IO.File]::Exists($DefaultTemplate)) {
+    Write-Host "HTML result-template files are missing."
+    $AllOk = $false
+} elseif (!(Select-String -LiteralPath $WebappFile -SimpleMatch -Pattern 'result_templates = {name.replace(os.sep, "/")' -Quiet)) {
+    Write-Host "Windows HTML result-template patch missing; reinstall using the latest installer."
+    $AllOk = $false
+} else {
+    Write-Host "HTML result-template routing: OK"
+}
+
 if ($AllOk) {
     Write-Host "All checks passed."
     exit 0

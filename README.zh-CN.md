@@ -257,3 +257,7 @@ SHA-256 校验文件并自动发布。
 SearXNG 从上游项目下载，使用 AGPL-3.0-or-later 许可证；小型
 `patches/api_pool.py` 引擎适配器同样标注为 AGPL-3.0-or-later。分发包含
 SearXNG 源码或修改文件的整包时，需要遵守其上游许可证。
+
+新安装默认根据浏览器语言显示界面；已有 `config/settings.yml` 不会被覆盖。
+旧版本如需取消固定中文，在 `ui:` 下设为 `default_locale: ""` 并重启。
+新版离线健康检查会验证结果模板补丁；`-LiveSearch` 检查的是 JSON，不能替代 HTML 搜索验收。
