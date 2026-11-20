@@ -83,9 +83,12 @@ SearXNG-compatible clients can use the standard JSON search endpoint, for exampl
 http://127.0.0.1:8888/search?q=example&format=json
 ```
 
-Keep clients on port `8888` while the API Pool is disabled. If you enable the
-API Pool below, point clients that should use the API-first chain at port `8890`.
-Clients may need to be restarted if they cache their configured endpoint.
+Port `8888` supports normal SearXNG HTML and JSON searches. When the API Pool is
+enabled and at least one provider key is configured, **default general/web searches
+use the API Pool first**, then free engines if the API tier returns no results.
+With no API keys, default searches go **directly to free engines** (no failed
+API attempt). Explicit engine selections and other search categories are unaffected.
+Port `8890` remains available as a direct JSON API-first Broker endpoint.
 
 ## Optional API Pool
 
@@ -108,8 +111,8 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. Change the base URL of clients that should use the API-first chain from
-   port `8888` to `8890`.
+4. Keep normal SearXNG web/JSON clients on `8888`; use `8890` only if you
+   need the Broker's direct JSON endpoint.
 5. Restart SearXNG and any client that caches its endpoint.
 
 The Broker starts only while the API Pool is enabled. It listens on

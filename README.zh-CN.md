@@ -77,8 +77,11 @@ http://127.0.0.1:8888
 http://127.0.0.1:8888/search?q=example&format=json
 ```
 
-API Pool 未启用时，客户端保持使用 `8888`。启用下面的 API Pool 后，需要走
-API-first 链路的客户端可改用 `8890`。如果客户端会缓存接口地址，修改后请重启。
+`8888` 同时提供网页和 JSON 搜索。**启用 API Pool 并配置至少一个有效 API Key**
+后，默认「综合/网页」搜索优先调用 API Pool；API 均无结果时再走免费引擎。
+**未配置 API Key 时直接使用免费引擎**，不会先发一次注定失败的 API 请求。
+手动指定引擎及其他搜索分类不受影响。`8890` 仍可作为独立的 API-first
+JSON 接口。
 
 ## 可选 API Pool
 
@@ -100,7 +103,8 @@ PARALLEL_API_KEY=
 API_POOL_PRIORITY=parallel,tavily,brave,firecrawl
 ```
 
-4. 将需要使用 API-first 链路的客户端基础地址从 `8888` 改成 `8890`。
+4. 普通网页和 SearXNG JSON 客户端继续使用 `8888`；只有直接调用 Broker JSON
+   接口时才使用 `8890`。
 5. 重启 SearXNG，以及会缓存接口地址的客户端。
 
 Broker 只在 API Pool 启用时启动，监听 `http://127.0.0.1:8890`，提供兼容

@@ -31,6 +31,19 @@ function Assert-SearchRendering {
     if ($Response.StatusCode -ne 200 -or $Response.Content -notmatch '<html') {
         throw "SearXNG HTML search failed."
     }
+    # Verify browser asset paths: homepage 200 is not enough if CSS/JS are 404.
+    $Home = Invoke-WebRequest -Uri "http://127.0.0.1:8888/" -UseBasicParsing -TimeoutSec 15
+    foreach ($Asset in @(
+        "/static/themes/simple/sxng-ltr.min.css",
+        "/static/themes/simple/sxng-core.min.js",
+        "/static/themes/simple/img/favicon.svg"
+    )) {
+        if (!$Home.Content.Contains($Asset)) {
+            throw "Homepage references the wrong Windows static asset path: $Asset"
+        }
+        $File = Invoke-WebRequest -Uri ("http://127.0.0.1:8888" + $Asset) -UseBasicParsing -TimeoutSec 15
+        if ($File.StatusCode -ne 200) { throw "Static asset $Asset returned HTTP $($File.StatusCode)." }
+    }
     Write-Host "PASS installed HTML templates and /search"
 }
 
@@ -103,6 +116,9 @@ try {
         Assert-SearchRendering
         $Health = Invoke-RestMethod -Uri "http://127.0.0.1:8890/health" -TimeoutSec 12
         if ($Health.status -ne "ok") { throw "API Pool broker did not become healthy." }
+        # Verify configured/no-key routing with mocked searches (never spends API credits).
+        & (Join-Path $InstallRoot ".venv\Scripts\python.exe") (Join-Path $PSScriptRoot "assert-api-priority.py") $InstallRoot
+        if ($LASTEXITCODE -ne 0) { throw "Web API-first routing verification failed." }
 
         # No provider keys: the public broker must return the free-search fallback path.
         $Fallback = Invoke-RestMethod -Uri "http://127.0.0.1:8890/search?q=windows-smoke&format=json&count=1" -TimeoutSec 42

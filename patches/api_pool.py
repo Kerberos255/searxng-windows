@@ -94,3 +94,53 @@ def response(resp) -> EngineResults:
         )
 
     return res
+
+
+# Default web searches use the API Pool only if at least one API is configured.
+# Explicit engine/bang choices, as well as non-web categories, are unchanged.
+def _broker_has_configured_providers() -> bool:
+    import json
+    from urllib.parse import urlsplit, urlunsplit
+    from urllib.request import ProxyHandler, build_opener
+
+    endpoint = urlsplit(broker_url)
+    if endpoint.scheme != "http" or endpoint.hostname not in ("localhost", "127.0.0.1", "::1"):
+        return False
+    status_url = urlunsplit((endpoint.scheme, endpoint.netloc, "/status", "", ""))
+    try:
+        opener = build_opener(ProxyHandler({}))
+        with opener.open(status_url, timeout=0.35) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read(65536))
+        return isinstance(payload, dict) and any(
+            provider.get("configured") is True
+            for provider in payload.get("providers", ())
+            if isinstance(provider, dict)
+        )
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+
+
+def apply_default_search_priority(search_query, raw_text_query, form) -> None:
+    """Prefer API Pool in default general/web searches; otherwise use free engines.
+
+    Manual !bang and engines= selection must continue to behave as requested.
+    """
+    if form.get("engines") or raw_text_query.specific:
+        return
+    selected_categories = set(search_query.categories)
+    if not selected_categories or not selected_categories <= {"general", "web"}:
+        return
+
+    pool = [ref for ref in search_query.engineref_list if ref.name == "api pool"]
+    if not pool:
+        return  # API Pool disabled by settings or the user's preferences.
+
+    if _broker_has_configured_providers():
+        search_query.engineref_list = pool
+    else:
+        # Don't make an API request when no API credentials are configured.
+        search_query.engineref_list = [
+            ref for ref in search_query.engineref_list if ref.name != "api pool"
+        ]
